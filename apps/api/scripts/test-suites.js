@@ -66,10 +66,62 @@ function filesFor(suite) {
   return allTestFiles().filter((f) => suiteFor(f) === suite);
 }
 
-module.exports = { allTestFiles, suiteFor, filesFor, SUITES, TESTS_DIR };
+/**
+ * CI shards: one slice of a suite, for running it across parallel jobs that
+ * each have their own database. The default suite took 20-25 minutes as one
+ * serial run; the files cannot share a database side by side (see
+ * run-db-test.sh), but separate jobs do not share one.
+ *
+ * Balanced by FILE SIZE, longest-processing-time first: biggest file to the
+ * lightest shard. Measured against per-file CI timings (2026-11-13, 415 files)
+ * size lands within ~10% of a timing-balanced split, and unlike a committed
+ * timings file it cannot go stale or need regenerating when tests are added.
+ * Ties break on path, so every job computes the same partition.
+ *
+ * A shard can never be empty (that would hand `node --test` no files, and with
+ * no files it discovers and runs everything): asking for more shards than files
+ * throws.
+ */
+function parseShard(spec) {
+  const m = /^(\d+)\/(\d+)$/.exec(String(spec).trim());
+  if (!m) throw new Error(`bad shard "${spec}" — expected INDEX/TOTAL, e.g. 2/4`);
+  const index = Number(m[1]);
+  const total = Number(m[2]);
+  if (total < 1 || index < 1 || index > total) {
+    throw new Error(`bad shard "${spec}" — INDEX must be 1..TOTAL`);
+  }
+  return { index, total };
+}
+
+function shardFiles(files, spec, sizeOf = (f) => fs.statSync(path.resolve(__dirname, '..', f)).size) {
+  const { index, total } = parseShard(spec);
+  if (files.length < total) {
+    throw new Error(`cannot split ${files.length} files into ${total} non-empty shards`);
+  }
+  const weighted = files
+    .map((f) => ({ f, w: sizeOf(f) }))
+    .sort((a, b) => b.w - a.w || (a.f < b.f ? -1 : 1));
+  const load = new Array(total).fill(0);
+  const owner = new Map();
+  for (const { f, w } of weighted) {
+    let k = 0;
+    for (let i = 1; i < total; i += 1) if (load[i] < load[k]) k = i;
+    load[k] += w;
+    owner.set(f, k);
+  }
+  // Keep the suite's own (sorted) order inside a shard.
+  return files.filter((f) => owner.get(f) === index - 1);
+}
+
+module.exports = { allTestFiles, suiteFor, filesFor, shardFiles, parseShard, SUITES, TESTS_DIR };
 
 // Invoked directly by the npm scripts: print the suite's files, space separated.
+// TEST_SHARD=INDEX/TOTAL (set by CI's matrix) prints just that shard's slice.
 if (require.main === module) {
   const suite = process.argv[2] || 'default';
-  process.stdout.write(filesFor(suite).join(' '));
+  const all = filesFor(suite);
+  const shard = process.env.TEST_SHARD;
+  const files = shard ? shardFiles(all, shard) : all;
+  if (shard) process.stderr.write(`[test-suites] ${suite} shard ${shard}: ${files.length} of ${all.length} files\n`);
+  process.stdout.write(files.join(' '));
 }

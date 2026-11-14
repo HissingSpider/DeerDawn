@@ -19,9 +19,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  api:
-    name: API - lint, tests
+  # The API suite shares one database per run and cannot run its files side by
+  # side, so it is split across jobs instead, each with its own Postgres. The
+  # split is by file size (apps/api/scripts/test-suites.js); every file runs in
+  # exactly one shard, and apps/api/tests/unit/test-suite-coverage.test.js fails
+  # if this matrix stops listing 1/N..N/N.
+  api-tests:
+    name: API - tests (${{ matrix.shard }})
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ['1/4', '2/4', '3/4', '4/4']
 
     services:
       postgres:
@@ -45,6 +55,7 @@ jobs:
       DISABLE_REDIS: "true"
       DB_CIRCUIT_BREAKER_TIMEOUT: "10000"
       NODE_ENV: test
+      TEST_SHARD: ${{ matrix.shard }}
 
     steps:
       - uses: actions/checkout@v7
@@ -55,23 +66,65 @@ jobs:
           cache: 'npm'
           cache-dependency-path: package-lock.json
 
+      # node_modules cache: the tree `npm ci` produces is a pure function of
+      # the lockfile, the Node version and the OS, so a hit skips npm ci. A miss
+      # installs and saves before any later step writes into node_modules.
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('.nvmrc', 'package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
 
+      - name: Save node_modules
+        if: steps.node-modules.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        continue-on-error: true
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: ${{ steps.node-modules.outputs.cache-primary-key }}
+
       - name: Lint
+        if: matrix.shard == '1/4'
         run: npm run lint -w deerdawn-api
 
       - name: Bootstrap test database
         run: bash apps/api/scripts/bootstrap-test-db.sh
 
       - name: Run native MCP review corpus
+        if: matrix.shard == '1/4'
         run: npm run test:mcp-review -w deerdawn-api
+        env:
+          # One file; it is not sharded. Empty means "the whole suite".
+          TEST_SHARD: ''
 
       - name: Run tests
         run: npm test -w deerdawn-api
 
       - name: Run behavioral layer suite
         run: npm run test:behavioral -w deerdawn-api
+
+  # One check for the whole API suite, so a required-check rule names one job.
+  api:
+    name: API - lint, tests
+    runs-on: ubuntu-latest
+    needs: api-tests
+    if: always()
+    steps:
+      - name: Every shard passed
+        run: |
+          echo "api-tests: ${{ needs.api-tests.result }}"
+          test "${{ needs.api-tests.result }}" = "success"
 
   dashboard:
     name: Dashboard - lint, type-check, tests
@@ -86,8 +139,33 @@ jobs:
           cache: 'npm'
           cache-dependency-path: package-lock.json
 
+      # node_modules cache: the tree `npm ci` produces is a pure function of
+      # the lockfile, the Node version and the OS, so a hit skips npm ci. A miss
+      # installs and saves before any later step writes into node_modules.
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('.nvmrc', 'package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
+
+      - name: Save node_modules
+        if: steps.node-modules.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        continue-on-error: true
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: ${{ steps.node-modules.outputs.cache-primary-key }}
 
       - name: Lint
         run: npm run lint -w dashboard
@@ -112,8 +190,33 @@ jobs:
           cache: 'npm'
           cache-dependency-path: package-lock.json
 
+      # node_modules cache: the tree `npm ci` produces is a pure function of
+      # the lockfile, the Node version and the OS, so a hit skips npm ci. A miss
+      # installs and saves before any later step writes into node_modules.
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('.nvmrc', 'package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
+
+      - name: Save node_modules
+        if: steps.node-modules.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        continue-on-error: true
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: ${{ steps.node-modules.outputs.cache-primary-key }}
 
       - name: shared-context - test
         run: npm test -w @deerdawn/shared-context
@@ -165,8 +268,33 @@ jobs:
           cache: 'npm'
           cache-dependency-path: package-lock.json
 
+      # node_modules cache: the tree `npm ci` produces is a pure function of
+      # the lockfile, the Node version and the OS, so a hit skips npm ci. A miss
+      # installs and saves before any later step writes into node_modules.
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('.nvmrc', 'package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
+
+      - name: Save node_modules
+        if: steps.node-modules.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        continue-on-error: true
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: ${{ steps.node-modules.outputs.cache-primary-key }}
 
       - name: Audit workspaces
         run: |

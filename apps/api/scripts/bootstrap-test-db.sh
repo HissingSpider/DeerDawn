@@ -76,6 +76,11 @@ log "Running test database migrations..."
   # filters on it, and their audience queries SWALLOW errors and return [], so the
   # failure mode is a green suite that selected nobody. Make it deterministic.
   node scripts/migrate-email-prefs.js || log "Warning: email prefs migration skipped"
+  # The schema the server creates at boot (oauth_clients and the rest). Without
+  # it a file passed only if an earlier file had booted the app — which a CI
+  # shard does not guarantee. Fails loudly: a half-migrated test DB is how a
+  # suite goes green while selecting nothing.
+  node scripts/migrate-boot-schema.js
 )
 
 # Fix table ownership for context_project_* tables — they may have been created by the OS

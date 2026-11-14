@@ -12,6 +12,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { redactSecrets } from '../src/redact.js';
+import { expectLinear } from './helpers/linear-time';
 
 const R = '[REDACTED]';
 
@@ -201,12 +202,6 @@ describe('redaction gaps', () => {
   });
 
   describe('stays linear', () => {
-    function millis(text: string): number {
-      const started = process.hrtime.bigint();
-      redactSecrets(text);
-      return Number(process.hrtime.bigint() - started) / 1e6;
-    }
-
     // One adversarial input per pattern that gained or changed a quantifier, so a
     // regression names the pattern instead of reporting "redaction got slow".
     const shapes: Array<[string, (n: number) => string]> = [
@@ -232,27 +227,13 @@ describe('redaction gaps', () => {
       ['a key name then an endless value', (n) => 'storageKey=' + 'aB3+'.repeat(n / 4)],
     ];
 
+    // The scaling check, its limits and why they are what they are live in
+    // tests/helpers/linear-time.ts (16x input, ratio under 64, 2 s backstop).
+    // The old inline check here, ratio < 30 on a 10x step, flaked at 31.96 on a
+    // CI runner with nothing wrong; quadratic is ~256x on this step.
     for (const [name, build] of shapes) {
       it(name, () => {
-        millis(build(2_000)); // warm the JIT so the first call is not the measured one
-        // Best of three: the suite runs files in parallel, and one descheduled
-        // run is a scheduler fact, not a property of the pattern.
-        const best = (n: number) => Math.min(millis(build(n)), millis(build(n)), millis(build(n)));
-        const small = Math.max(best(20_000), 0.5);
-        const large = best(200_000);
-        // Ratios, not milliseconds: CI runners are noisy and the property is the
-        // SHAPE of the curve. Linear is ~10x, quadratic ~100x.
-        //
-        // The ratio only means something once the large run is slow enough to
-        // measure. A shape that redacts 200 KB in a few milliseconds has a small
-        // sample under the 0.5ms floor, and then the ratio is scheduler noise:
-        // under a parallel suite this failed at 16ms / 0.5ms = 32 on a pattern
-        // that is nowhere near quadratic (the quadratic version took 31 SECONDS
-        // at this size). Below 50ms the absolute bound is the whole check.
-        if (large > 50) {
-          expect(large / small, `${small.toFixed(1)}ms -> ${large.toFixed(1)}ms`).toBeLessThan(30);
-        }
-        expect(large).toBeLessThan(2000);
+        expectLinear((n) => { redactSecrets(build(n)); }, 200_000, name);
       });
     }
   });

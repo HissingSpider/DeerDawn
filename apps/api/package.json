@@ -32,9 +32,9 @@
     "test:layer8": "bash scripts/run-db-test.sh node --test --test-timeout=120000 tests/layer8-performance.test.js",
     "test:layer9": "bash scripts/run-db-test.sh node --test --test-timeout=120000 tests/layer9-e2e-flows.test.js",
     "test:layers": "bash scripts/run-db-test.sh bash tests/run-all-layers.sh all",
-    "test:behavioral": "bash scripts/run-db-test.sh bash -lc 'node --test --test-concurrency=1 --test-timeout=180000 $(node scripts/test-suites.js behavioral)'",
+    "test:behavioral": "bash scripts/run-db-test.sh bash -lc 'files=$(node scripts/test-suites.js behavioral) || exit 1; node --test --test-concurrency=1 --test-timeout=180000 $files'",
     "test:mcp-review": "bash scripts/run-db-test.sh bash -lc 'node --test --test-timeout=120000 $(node scripts/test-suites.js review)'",
-    "test": "bash scripts/run-db-test.sh bash -lc 'node --test --test-concurrency=1 --test-timeout=180000 $(node scripts/test-suites.js default)'",
+    "test": "bash scripts/run-db-test.sh bash -lc 'files=$(node scripts/test-suites.js default) || exit 1; node --test --test-concurrency=1 --test-timeout=180000 $files'",
     "openapi:export": "node -e \"console.log(JSON.stringify(require('./src/docs/registry').generateOpenApiSpec(), null, 2))\" > openapi.json",
     "test:layer10": "bash scripts/run-db-test.sh node --test --test-timeout=120000 tests/layer10-complete-journey.test.js"
   },

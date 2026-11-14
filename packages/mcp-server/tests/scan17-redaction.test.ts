@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { redactSecrets } from '../src/redact.js';
+import { expectLinear } from './helpers/linear-time';
 
 const hex = (n, seed = 5) => Array.from({ length: n }, (_, i) => '0123456789abcdef'[(i * 7 + seed) % 16]).join('');
 const aln = (n, seed = 2) => Array.from({ length: n }, (_, i) => 'aB3dE5gH7jK9mN1pQ2rS4tU6vW8xY0z'[(i * 5 + seed) % 31]).join('');
@@ -115,12 +116,13 @@ describe('scan 17: client redactor', () => {
 
   it('stays linear on 256 KB of each new prefix', () => {
     const N = 256 * 1024;
-    const fill = (unit: string) => unit.repeat(Math.ceil(N / unit.length)).slice(0, N);
+    const fill = (unit: string, n: number) => unit.repeat(Math.ceil(n / unit.length)).slice(0, n);
     for (const seed of ['NRAK-', 'sntrys_eyJ', 'sk.eyJaaaaaaaaaaaa.', 'ATATT3', 'gldt-', 'hvs.a', 'glc_1',
       'aaaaaaaaaaaaaa.atlasv1.', 'TF_TOKEN_a=', 'a://b:1,', 'http://a:b,c:', 'PASSWORD=$a', 'cacheKey=']) {
-      const started = performance.now();
-      redactSecrets(fill(seed));
-      expect(performance.now() - started, seed).toBeLessThan(200);
+      // Was an absolute 200 ms per seed, which a CI runner missed at 239.8 ms
+      // with nothing wrong. Scaling is what catastrophic backtracking breaks;
+      // see tests/helpers/linear-time.ts for the check and its limits.
+      expectLinear((n) => { redactSecrets(fill(seed, n)); }, N, seed);
     }
   });
 });

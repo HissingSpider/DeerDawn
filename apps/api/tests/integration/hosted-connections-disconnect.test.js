@@ -45,6 +45,17 @@ const workspace = require('../../src/services/workspaceService');
 const { redis } = require('../../src/config/redis');
 const { generateToken, hashPassword, generateApiKey, hashApiKey } = require('../../src/utils/security');
 
+const { runAutoMigration } = require('../../src/config/autoMigrate');
+
+// oauth_clients (and the rest of the boot schema) is created by
+// runAutoMigration, which runs at server boot, not on require('app'). This file
+// used to pass only because an earlier file in the serial run had migrated the
+// shared database; on its own CI shard it met a fresh one and every connect
+// answered 503. Migrate here so the file stands alone.
+test.before(async () => {
+  await runAutoMigration();
+});
+
 const httpServer = app.listen(0);
 test.after(() => new Promise((resolve) => httpServer.close(resolve)));
 

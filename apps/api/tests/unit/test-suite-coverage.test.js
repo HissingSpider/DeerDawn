@@ -82,3 +82,58 @@ test('this guard is itself in the default suite', () => {
   assert.equal(suites.suiteFor(self), 'default');
   assert.ok(suites.allTestFiles().includes(self), 'the guard must be discoverable on disk');
 });
+
+// ── CI shards ────────────────────────────────────────────────────────────────
+// CI splits the default and behavioral suites across parallel jobs. A file that
+// lands in no shard runs nowhere, which is the same silent loss this guard was
+// written for, so the partition is held to the same standard as the suites.
+
+test('every shard split is a partition: each file in exactly one shard, none empty', () => {
+  for (const suite of ['default', 'behavioral']) {
+    const all = suites.filesFor(suite);
+    for (let total = 1; total <= Math.min(8, all.length); total += 1) {
+      const seen = new Map(all.map((f) => [f, 0]));
+      for (let index = 1; index <= total; index += 1) {
+        const slice = suites.shardFiles(all, `${index}/${total}`);
+        assert.ok(slice.length > 0, `${suite} shard ${index}/${total} is empty`);
+        for (const f of slice) {
+          assert.ok(seen.has(f), `${suite} shard ${index}/${total} names ${f}, which is not in the suite`);
+          seen.set(f, seen.get(f) + 1);
+        }
+      }
+      const wrong = [...seen].filter(([, n]) => n !== 1);
+      assert.deepEqual(wrong, [], `${suite} split ${total} ways runs these files 0 or 2+ times`);
+    }
+  }
+});
+
+test('the shard split is deterministic and keeps suite order inside a shard', () => {
+  const all = suites.filesFor('default');
+  const a = suites.shardFiles(all, '2/4');
+  const b = suites.shardFiles([...all].reverse(), '2/4');
+  assert.deepEqual([...b].reverse(), a, 'input order must not change which files a shard gets');
+  assert.deepEqual(a, [...a].sort(), 'files inside a shard keep the suite order');
+});
+
+test('a malformed or impossible shard throws instead of selecting nothing', () => {
+  // `node --test` handed zero files discovers and runs everything, so an empty
+  // shard must be an error, never an empty list.
+  const all = suites.filesFor('behavioral');
+  for (const bad of ['0/4', '5/4', '1/0', '2', 'a/b', '']) {
+    assert.throws(() => suites.shardFiles(all, bad), /bad shard/, `"${bad}" must be refused`);
+  }
+  assert.throws(() => suites.shardFiles(all.slice(0, 2), '1/3'), /non-empty shards/);
+});
+
+test('CI runs every shard it declares: the matrix lists 1/N..N/N exactly', () => {
+  // Each matrix entry names its own INDEX/TOTAL, so dropping an entry without
+  // changing TOTAL would leave a slice of the suite running nowhere.
+  const workflow = path.resolve(__dirname, '../../../../.github/workflows/ci.yml');
+  const source = fs.readFileSync(workflow, 'utf8');
+  const m = source.match(/^\s*shard:\s*\[([^\]]*)\]/m);
+  assert.ok(m, `${workflow} has no \`shard: [...]\` matrix — the API job is no longer sharded?`);
+  const shards = m[1].split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, ''));
+  const total = shards.length;
+  assert.deepEqual(shards, Array.from({ length: total }, (_, i) => `${i + 1}/${total}`));
+  assert.match(source, /TEST_SHARD:\s*\$\{\{\s*matrix\.shard\s*\}\}/, 'the matrix value must reach TEST_SHARD');
+});

@@ -81,9 +81,19 @@ async function migrateOwner(owner) {
   try {
     await client.query('BEGIN');
     const started = Date.now();
-    const stats = await graph.migrateProjectRootsForOwner((text, params) => client.query(text, params), owner);
+    // Work done, counted: how many statements the repair sent and how many rows
+    // came back to JS. These are what the ~13s/~20s regression multiplied (one
+    // read per root of every evidence row on every entity), and unlike elapsed
+    // time they do not move with how busy the runner is.
+    const work = { queries: 0, rows: 0 };
+    const stats = await graph.migrateProjectRootsForOwner(async (text, params) => {
+      const res = await client.query(text, params);
+      work.queries += 1;
+      work.rows += Array.isArray(res.rows) ? res.rows.length : 0;
+      return res;
+    }, owner);
     await client.query('COMMIT');
-    return { stats, ms: Date.now() - started };
+    return { stats, work, ms: Date.now() - started };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -128,6 +138,32 @@ async function bigWorkspace({ projects: P, entities: E, sharedNames }) {
   return owner;
 }
 
+// The guard on the repair's cost. The regression read, PER ROOT, every evidence
+// row on every entity the root touched: 300 roots x 60k evidence came to ~18M
+// rows (~20s), 100 roots x 20k to ~2M (~13s). The set-based repair reads each
+// evidence and edge row about once, so rows read stay linear in the owner's data
+// and statements linear in roots. Measured 2026-11-13: 72,900 rows / 306
+// statements, and 24,250 / 256; the bounds below sit about 2x above that and
+// orders of magnitude below the old path.
+//
+// Elapsed time is NOT the guard any more. A per-owner split that runs in ~1.3s
+// on a GitHub runner took 9.5s once with nothing changed (run 43543720504) and
+// failed an 8s budget; wall-clock budgets on shared runners flake. What remains
+// is a backstop for something catastrophic, far clear of runner noise.
+const WALL_CLOCK_BACKSTOP_MS = 30000;
+async function assertLinearWork(owner, { work, ms }, roots, label) {
+  const evidenceRows = await count(owner, 'context_graph_evidence');
+  const edgeRows = await count(owner, 'context_graph_edges');
+  const rowBudget = 2 * (evidenceRows + edgeRows);
+  assert.ok(
+    work.rows <= rowBudget,
+    `${label}: the repair read ${work.rows} rows for ${evidenceRows} evidence + ${edgeRows} edges (budget ${rowBudget}) — per-root reads are back`,
+  );
+  const queryBudget = 10 * roots + 20;
+  assert.ok(work.queries <= queryBudget, `${label}: ${work.queries} statements for ${roots} roots (budget ${queryBudget})`);
+  assert.ok(ms < WALL_CLOCK_BACKSTOP_MS, `${label}: took ${ms}ms, past the ${WALL_CLOCK_BACKSTOP_MS}ms backstop`);
+}
+
 test.before(async () => {
   await runAutoMigration();
 });
@@ -136,19 +172,21 @@ test.after(() => db.pool.end());
 test('perf: 300 projects x 40 shared entities (60k evidence) re-key in well under the breaker', { timeout: 180000 }, async () => {
   const owner = await bigWorkspace({ projects: 300, entities: 40, sharedNames: false });
   const before = await count(owner, 'context_graph_evidence');
-  const { stats, ms } = await migrateOwner(owner);
-  console.log(`# 300 unique roots: ${ms}ms ${JSON.stringify(stats)}`);
+  const run = await migrateOwner(owner);
+  const { stats, work, ms } = run;
+  console.log(`# 300 unique roots: ${ms}ms ${JSON.stringify(stats)} ${JSON.stringify(work)}`);
   assert.equal(stats.rekeyed, 300);
   assert.equal(await count(owner, 'context_graph_evidence'), before, 'no evidence lost');
   assert.equal(await legacyLeft(owner), 0);
-  assert.ok(ms < 3000, `one owner's repair took ${ms}ms (was ~20s)`);
+  await assertLinearWork(owner, run, 300, 'one owner\'s re-key (was ~20s, ~18M rows)');
 });
 
 test('perf: 100 projects, 50 same-name pairs split in well under the breaker', { timeout: 180000 }, async () => {
   const owner = await bigWorkspace({ projects: 100, entities: 40, sharedNames: true });
   const before = await count(owner, 'context_graph_evidence');
-  const { stats, ms } = await migrateOwner(owner);
-  console.log(`# 50 split roots: ${ms}ms ${JSON.stringify(stats)}`);
+  const run = await migrateOwner(owner);
+  const { stats, work, ms } = run;
+  console.log(`# 50 split roots: ${ms}ms ${JSON.stringify(stats)} ${JSON.stringify(work)}`);
   assert.equal(stats.split, 50);
   assert.equal(stats.rootsCreated, 50);
   assert.equal(await count(owner, 'context_graph_evidence'), before, 'no evidence lost');
@@ -161,11 +199,7 @@ test('perf: 100 projects, 50 same-name pairs split in well under the breaker', {
     [owner],
   )).rows[0].n;
   assert.equal(mis, 0);
-  // 1.4-1.7s on a developer machine; a shared GitHub runner is several times
-  // slower and went past the old 3s budget. What this guards is the ~13s
-  // per-owner regression, and staying under the 10s DB circuit breaker CI
-  // runs with, so the budget sits between the two.
-  assert.ok(ms < 8000, `one owner's split took ${ms}ms (was ~13s)`);
+  await assertLinearWork(owner, run, 100, 'one owner\'s split (was ~13s, ~2M rows)');
 });
 
 test('boot: runAutoMigration no longer runs the re-key (a legacy root survives a boot)', async () => {
