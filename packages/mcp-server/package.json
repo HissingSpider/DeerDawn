@@ -1,0 +1,67 @@
+{
+  "name": "@deerdawn/mcp-server",
+  "mcpName": "com.deerdawn/deerdawn",
+  "version": "1.0.59",
+  "description": "MCP server for DeerDawn — AI session memory that briefs every new AI session",
+  "homepage": "https://deerdawn.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HissingSpider/DeerDawn.git",
+    "directory": "packages/mcp-server"
+  },
+  "bugs": {
+    "url": "https://deerdawn.com/contact"
+  },
+  "type": "module",
+  "bin": {
+    "deerdawn-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "npm run typecheck && tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "npm run build && npm run test:dist-contract && npm run test:vitest && npm run test:node",
+    "test:vitest": "vitest run",
+    "test:node": "node --test tests/*.node.test.cjs",
+    "test:packaged": "npm run build && npm run test:packaged:run",
+    "test:packaged:run": "node --test tests/packaged-stdio.smoke.cjs",
+    "test:dist-contract": "node tests/dist-build.contract.cjs",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "axios": "^1.7.9",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@typescript-eslint/eslint-plugin": "^8.18.2",
+    "@typescript-eslint/parser": "^8.18.2",
+    "eslint": "^9.18.0",
+    "nock": "^14.0.0",
+    "tsup": "^8.3.5",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "deerdawn",
+    "session-memory",
+    "ai-context",
+    "ai-agents",
+    "claude",
+    "cursor",
+    "windsurf",
+    "copilot",
+    "codeium",
+    "continue",
+    "zed"
+  ],
+  "author": "Deerdawn",
+  "license": "MIT"
+}

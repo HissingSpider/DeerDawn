@@ -1,0 +1,20 @@
+# HTTPS on your own domain (automatic Let's Encrypt certificates via Caddy).
+#
+# Enable it by listing this file after the main one in .env:
+#   COMPOSE_FILE=docker-compose.yml:infra/selfhost/docker-compose.https.yml
+#   DEERDAWN_DOMAIN=deerdawn.example.com
+#   DEERDAWN_PUBLIC_URL=https://deerdawn.example.com
+# (scripts/selfhost/init.sh --domain deerdawn.example.com writes all three.)
+#
+# Requirements: a DNS A/AAAA record for the domain pointing at this host, and
+# ports 80 and 443 reachable from the internet (80 is used for the ACME
+# HTTP-01 challenge and redirects to 443).
+
+services:
+  caddy:
+    environment:
+      CADDY_SITE_ADDRESS: ${DEERDAWN_DOMAIN:?set DEERDAWN_DOMAIN in .env to use HTTPS mode}
+    ports: !override
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"

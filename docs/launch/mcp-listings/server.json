@@ -1,0 +1,37 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.deerdawn/deerdawn",
+  "description": "AI session memory: the brief your AI reads before every session so no session starts cold.",
+  "version": "1.0.59",
+  "websiteUrl": "https://deerdawn.com",
+  "repository": {
+    "url": "https://github.com/HissingSpider/deerdawn-mcp",
+    "source": "github",
+    "id": "1333904592"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@deerdawn/mcp-server",
+      "version": "1.0.59",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "DEERDAWN_API_URL",
+          "description": "DeerDawn API base URL",
+          "isRequired": false,
+          "default": "https://api.deerdawn.com"
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://api.deerdawn.com/mcp"
+    }
+  ]
+}

@@ -1,0 +1,179 @@
+name: CI
+
+# Public CI for the open-source export. Maintained in the private repository at
+# scripts/open-source/overlay/.github/workflows/ci.yml and copied over the
+# export by scripts/open-source/export.sh; edit it there, not here.
+
+on:
+  push:
+    branches: [ main ]
+  # Unfiltered on purpose: a `branches:` filter here matches the BASE branch, so
+  # a pull request stacked on another branch would run no CI at all.
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API - lint, tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: deerdawn
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: deerdawn_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://deerdawn:password@localhost:5432/deerdawn_dev
+      JWT_SECRET: test-secret
+      DEERDAWN_API_KEY: dev-key
+      DISABLE_REDIS: "true"
+      DB_CIRCUIT_BREAKER_TIMEOUT: "10000"
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint -w deerdawn-api
+
+      - name: Bootstrap test database
+        run: bash apps/api/scripts/bootstrap-test-db.sh
+
+      - name: Run native MCP review corpus
+        run: npm run test:mcp-review -w deerdawn-api
+
+      - name: Run tests
+        run: npm test -w deerdawn-api
+
+      - name: Run behavioral layer suite
+        run: npm run test:behavioral -w deerdawn-api
+
+  dashboard:
+    name: Dashboard - lint, type-check, tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint -w dashboard
+
+      # Type-check only: `next build` needs real Clerk keys.
+      - name: Type-check
+        run: npx tsc --noEmit -p apps/dashboard
+
+      - name: Unit tests
+        run: npm test -w dashboard
+
+  packages:
+    name: Shared packages - build, test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: shared-context - test
+        run: npm test -w @deerdawn/shared-context
+
+      - name: tool-adapters - test
+        run: npm test -w @deerdawn/tool-adapters
+
+      - name: Install rolldown Linux native binding
+        run: npm install @rolldown/binding-linux-x64-gnu --no-save 2>/dev/null || true
+
+      - name: MCP server - build
+        run: npm run build -w @deerdawn/mcp-server
+
+      - name: MCP server - lint
+        run: npm run lint -w @deerdawn/mcp-server
+
+      - name: MCP server - test
+        run: npm test -w @deerdawn/mcp-server
+
+      - name: MCP server - packaged stdio smoke
+        run: npm run test:packaged:run -w @deerdawn/mcp-server
+
+  styleguards:
+    name: Style guards
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+
+      # grid-cols-[1fr,1fr] is invalid CSS and silently collapses to one column.
+      - name: No comma-separated Tailwind grid values
+        run: node scripts/check-no-comma-grid.mjs
+
+  audit:
+    name: Dependency audit (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit workspaces
+        run: |
+          fail=0
+          for ws in deerdawn-api dashboard @deerdawn/mcp-server; do
+            echo "::group::npm audit -w $ws"
+            npm audit --omit=dev --audit-level=high -w "$ws" || fail=1
+            echo "::endgroup::"
+          done
+          exit "$fail"

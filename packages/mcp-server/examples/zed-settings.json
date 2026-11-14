@@ -1,0 +1,16 @@
+{
+  "context_servers": {
+    "deerdawn": {
+      "command": {
+        "path": "npx",
+        "args": ["-y", "@deerdawn/mcp-server@latest"],
+        "env": {
+          "DEERDAWN_API_URL": "https://api.deerdawn.com",
+          "DEERDAWN_API_KEY": "dd_prod_your_api_key_here",
+          "DEERDAWN_ORG_ID": "org-abc123",
+          "DEERDAWN_ENVIRONMENT": "production"
+        }
+      }
+    }
+  }
+}

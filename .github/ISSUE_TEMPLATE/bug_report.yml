@@ -1,0 +1,54 @@
+name: Bug report
+description: Something in DeerDawn does not work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. For a security problem, do not file an issue: see SECURITY.md.
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where did it happen?
+      options:
+        - Hosted service (deerdawn.com)
+        - Self-hosted server
+        - "@deerdawn/mcp-server (local MCP)"
+        - Dashboard
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: AI tool
+      description: Which AI client were you using, if any?
+      placeholder: Claude Code 2.x, Cursor, Codex, ChatGPT, Claude.ai...
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The mcp-server version (`npx @deerdawn/mcp-server --version`) or, for self-hosted, the release or commit.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or error output
+      description: Remove API keys, tokens and anything private from your brief before pasting.
+      render: shell

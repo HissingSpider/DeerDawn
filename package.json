@@ -1,0 +1,29 @@
+{
+  "name": "deerdawn",
+  "license": "AGPL-3.0-only",
+  "description": "DeerDawn — AI session memory. Never start cold: the brief every new AI session reads.",
+  "private": true,
+  "packageManager": "npm@10.8.2",
+  "scripts": {
+    "lint:grid": "node scripts/check-no-comma-grid.mjs"
+  },
+  "workspaces": [
+    "apps/api",
+    "apps/consumer-sim",
+    "apps/dashboard",
+    "packages/mcp-server",
+    "packages/shared-context",
+    "packages/tool-adapters"
+  ],
+  "overrides": {
+    "js-cookie": "3.0.7",
+    "postcss": "8.5.24",
+    "esbuild": "0.28.0",
+    "sharp": "^0.35.0",
+    "@opentelemetry/propagator-jaeger": "^2.9.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.0"
+  }
+}

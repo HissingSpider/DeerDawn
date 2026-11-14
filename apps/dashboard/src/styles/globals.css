@@ -1,0 +1,913 @@
+@import "tailwindcss";
+
+/* ── Theming ──────────────────────────────────────────────────────────────────
+   Dark is the default palette (also the SSR / no-JS fallback). Light applies when
+   the OS prefers light and the user hasn't overridden (`:root:not([data-theme])`),
+   or when the user explicitly picks Light (`[data-theme="light"]`). A manual Dark
+   pick sets `[data-theme="dark"]`, which excludes the media query and falls through
+   to :root. The pre-paint /theme-init.js script keeps this flash-free; see
+   useTheme.ts + ThemeToggle.tsx for the runtime. Add new colors as tokens here,
+   never as raw hex in components, so both themes stay in sync. */
+:root {
+  color-scheme: dark;
+
+  /* Surface layers — use elevation intentionally */
+  --background: #07111d;
+  --surface: #0d1827;
+  --surface-elevated: #142133;
+  --surface-hover: #18273b;
+  --border: #203048;
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+
+  /* Neutral "tint the surface" overlays. Dark = white at low alpha; the light
+     palette flips them to near-black so var(--overlay-*) works in both themes.
+     These replace the ~250 raw rgba(255,255,255,x) usages across components. */
+  --overlay-subtle: rgba(255, 255, 255, 0.02);
+  --overlay-hover: rgba(255, 255, 255, 0.04);
+  --overlay-active: rgba(255, 255, 255, 0.06);
+  --overlay-strong: rgba(255, 255, 255, 0.10);
+  --scrim: rgba(0, 0, 0, 0.6);
+
+  /* Brand */
+  --primary: #10B981;
+  --primary-hover: #059669;
+  --primary-soft: rgba(16, 185, 129, 0.1);
+  --accent: #FBBF24;
+  /* Text/icon on a --primary fill. Theme-independent (emerald is a mid-tone). */
+  --on-primary: #03120b;
+
+  /* Text — blue-tinted for cohesion with the dark surface */
+  --text-primary: #eef3fb;
+  --text-secondary: #b7c5d9;
+  --text-muted: #8593ab;
+
+  /* Semantic status colors — strictly typed, never mixed */
+  --status-allow: #10B981;       /* Green = allowed */
+  --status-deny: #EF4444;        /* Red = denied */
+  --status-escalate: #F59E0B;    /* Amber = escalated */
+  --status-info: #3B82F6;        /* Blue = system / neutral */
+  --status-audit: #8B5CF6;       /* Purple = audit */
+  --status-info-bg: rgba(59, 130, 246, 0.08);
+
+  --status-allow-bg: rgba(16, 185, 129, 0.08);
+  --status-deny-bg: rgba(239, 68, 68, 0.08);
+  --status-escalate-bg: rgba(245, 158, 11, 0.08);
+  --status-danger-text: #f87171;
+  /* Warning text that stays legible on BOTH grounds. Amber-400 reads on the dark
+     surface but drops to ~2:1 on white, which is why the light palette below uses
+     amber-700. Pair with --status-escalate-bg for tinted surfaces. */
+  --status-warning-text: #FBBF24;
+
+  /* Shadow system */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.38);
+  --shadow-lg: 0 20px 44px rgba(0, 0, 0, 0.44);
+
+  /* Drives <meta name="theme-color"> (browser chrome) via theme-init.js. */
+  --theme-color-bar: #07111d;
+
+  /* Typography scale */
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+
+  /* Spacing (8px-based) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* Border-radius tokens. These power a few CSS surfaces below
+     (.dashboard-surface / .dashboard-metric / .dashboard-empty-icon via
+     --radius-lg). Most components set radius with Tailwind directly, and the
+     product's real scale is larger than these tokens: rows ~10–12px, cards
+     ~16px (rounded-2xl), modals/large surfaces ~20–28px. Prefer rounded-xl/2xl
+     in components; don't trust these as the whole system. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 8px;
+  --focus-ring: 0 0 0 3px rgba(16, 185, 129, 0.24);
+
+  /* Page layout — single source of truth for the dashboard content frame.
+     Every page is centered inside this width with consistent gutters; do
+     not re-roll per-page max-widths or padding (see AppShell). */
+  --dashboard-content-max: 1200px;
+  --dashboard-gutter: 2.5rem;
+  --dashboard-gutter-sm: 1.25rem;
+}
+
+/* Light palette — authored once here and mirrored under the prefers-color-scheme
+   media query below. Keep the two in sync. Only color tokens flip; the
+   typography / spacing / radius / layout tokens above are theme-independent. */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --background: #f7f9fc;
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --surface-hover: #f1f5f9;
+  --border: #e2e8f0;
+  --border-subtle: rgba(15, 23, 42, 0.08);
+  --border-strong: rgba(15, 23, 42, 0.16);
+
+  --overlay-subtle: rgba(15, 23, 42, 0.02);
+  --overlay-hover: rgba(15, 23, 42, 0.04);
+  --overlay-active: rgba(15, 23, 42, 0.06);
+  --overlay-strong: rgba(15, 23, 42, 0.08);
+  --scrim: rgba(15, 23, 42, 0.4);
+
+  /* Deeper emerald in light mode so emerald TEXT is readable on white
+     (#10B981 ~2.5:1 → #047857 ~5.5:1); fills stay emerald with white on-primary.
+     Dark mode keeps the brighter #10B981 in :root. */
+  --primary: #047857;
+  --primary-hover: #065f46;
+  --primary-soft: rgba(16, 185, 129, 0.12);
+  --on-primary: #ffffff;
+  --accent: #D97706;
+
+  --text-primary: #0f1b2d;
+  --text-secondary: #475569;
+  --text-muted: #5b6a7d;
+
+  --status-info-bg: rgba(59, 130, 246, 0.10);
+  --status-allow-bg: rgba(16, 185, 129, 0.10);
+  --status-deny-bg: rgba(239, 68, 68, 0.10);
+  --status-escalate-bg: rgba(245, 158, 11, 0.12);
+  --status-danger-text: #dc2626;
+  --status-warning-text: #B45309;
+
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.10);
+  --shadow-lg: 0 20px 44px rgba(15, 23, 42, 0.12);
+
+  --focus-ring: 0 0 0 3px rgba(16, 185, 129, 0.28);
+  --theme-color-bar: #f7f9fc;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+
+    --background: #f7f9fc;
+    --surface: #ffffff;
+    --surface-elevated: #ffffff;
+    --surface-hover: #f1f5f9;
+    --border: #e2e8f0;
+    --border-subtle: rgba(15, 23, 42, 0.08);
+    --border-strong: rgba(15, 23, 42, 0.16);
+
+    --overlay-subtle: rgba(15, 23, 42, 0.02);
+    --overlay-hover: rgba(15, 23, 42, 0.04);
+    --overlay-active: rgba(15, 23, 42, 0.06);
+    --overlay-strong: rgba(15, 23, 42, 0.08);
+    --scrim: rgba(15, 23, 42, 0.4);
+
+    --primary: #047857;
+    --primary-hover: #065f46;
+    --on-primary: #ffffff;
+    --primary-soft: rgba(16, 185, 129, 0.12);
+    --accent: #D97706;
+
+    --text-primary: #0f1b2d;
+    --text-secondary: #475569;
+    --text-muted: #5b6a7d;
+
+    --status-info-bg: rgba(59, 130, 246, 0.10);
+    --status-allow-bg: rgba(16, 185, 129, 0.10);
+    --status-deny-bg: rgba(239, 68, 68, 0.10);
+    --status-escalate-bg: rgba(245, 158, 11, 0.12);
+    --status-danger-text: #dc2626;
+    --status-warning-text: #B45309;
+
+    --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
+    --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.10);
+    --shadow-lg: 0 20px 44px rgba(15, 23, 42, 0.12);
+
+    --focus-ring: 0 0 0 3px rgba(16, 185, 129, 0.28);
+    --theme-color-bar: #f7f9fc;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-on-primary: var(--on-primary);
+  --color-accent: var(--accent);
+
+  --color-overlay-subtle: var(--overlay-subtle);
+  --color-overlay-hover: var(--overlay-hover);
+  --color-overlay-active: var(--overlay-active);
+  --color-overlay-strong: var(--overlay-strong);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
+  /* Danger text that stays legible in both themes (dark #f87171 / light #dc2626).
+     Use this instead of raw red-400/red-50, which are dark-first and vanish on
+     the light surface. */
+  --color-status-danger: var(--status-danger-text);
+
+  /* Warning text, same contract as danger: amber-400 on dark, amber-700 on light.
+     Reach for this instead of amber-300/400, which wash out on the white surface. */
+  --color-status-warning: var(--status-warning-text);
+
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Theme-aware asset swap — pair a light-on-dark and a dark-on-light image and
+   toggle them purely in CSS (no JS, no flash, no hydration swap). Dark is the
+   default, so .theme-light-only is hidden until light resolves. Used by
+   <BrandLogo> to swap the deer mark. */
+.theme-light-only {
+  display: none;
+}
+:root[data-theme="light"] .theme-light-only {
+  display: block;
+}
+:root[data-theme="light"] .theme-dark-only {
+  display: none;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .theme-light-only {
+    display: block;
+  }
+  :root:not([data-theme]) .theme-dark-only {
+    display: none;
+  }
+}
+
+html,
+body {
+  height: 100%;
+  max-width: 100vw;
+  margin: 0;
+  overflow: hidden;
+  background-color: var(--background);
+  color: var(--text-primary);
+  font-family: var(--font-inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#__next {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Pages that render OUTSIDE the dashboard shell own the document scroll.
+ *
+ * The rules above give the shell a fixed-height app layout whose panes scroll
+ * internally — correct there, and load-bearing. But /onboarding, /checkout,
+ * /select-plan, /invite, /mcp-auth and /404 render standalone, and they
+ * inherited `overflow: hidden` with nothing to scroll internally. Any content
+ * past the fold became unreachable: measured on the connect step at 1280x720,
+ * document scrollHeight was 720 with the content 1170px tall, maxScroll 0, and
+ * the "Next: your first brief" button pinned at y=959 — off-screen, unscrollable,
+ * not clickable even by an automated click. That step has recorded zero
+ * completions since 2026-07-26.
+ *
+ * Opt-in by class rather than flipping the default, so the shell's layout is
+ * untouched: with no .page-scroll on <html>, every rule below is inert and the
+ * computed styles are byte-identical to before. Applied via usePageScroll(). */
+html.page-scroll,
+html.page-scroll body {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+}
+
+html.page-scroll #__next {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+}
+
+::selection {
+  background-color: var(--primary);
+  color: var(--on-primary);
+}
+
+/* No `color` here, on purpose. This rule is unlayered and Tailwind's colour
+   utilities live in @layer utilities, so a `color` here beat every one of them:
+   "Restore a project" and "Update billing" asked for `text-on-primary` on a green
+   fill and got the page's text colour instead (3.15:1 light, 2.28:1 dark), and
+   every other link that asked for a colour got its parent's. Tailwind's preflight
+   already says `a { color: inherit }` in @layer base, so a link that asks for no
+   colour still inherits one. tests/unlayered-link-color-contract.test.js keeps
+   it this way. */
+a {
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+/* Brand-color native checkboxes/radios (custom sr-only inputs opt out) */
+input[type="checkbox"]:not(.sr-only),
+input[type="radio"]:not(.sr-only) {
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Animation utilities */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.dashboard-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.dashboard-topnav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  border-bottom: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--background) 92%, transparent);
+  backdrop-filter: blur(18px);
+  padding: 0 2rem;
+  height: 64px;
+}
+
+/* No `display` here, on purpose. TopNav gives this element `hidden md:flex`,
+   and those utilities live in Tailwind's @layer utilities, while every rule in
+   this file is unlayered — and an unlayered rule beats a layered one regardless
+   of order or media query. With `display: flex` here, `hidden` never applied and
+   phones got the whole desktop nav: 742px of header in a 375px viewport, with
+   Settings and the account menu clipped off-screen. The element's utilities own
+   its display; tests/unlayered-display-contract.test.js keeps it that way. */
+.dashboard-nav-links {
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.dashboard-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 8px;
+  color: var(--text-muted);
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+  transition: background-color 150ms ease, color 150ms ease;
+  white-space: nowrap;
+}
+
+.dashboard-nav-link:hover {
+  background: var(--overlay-hover);
+  color: var(--text-primary);
+}
+
+.dashboard-nav-link-active {
+  color: var(--text-primary);
+  background: var(--overlay-active);
+}
+
+.dashboard-nav-icon {
+  display: inline-flex;
+  opacity: 0.7;
+}
+
+.dashboard-nav-link-active .dashboard-nav-icon {
+  opacity: 1;
+  color: var(--primary);
+}
+
+.dashboard-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dashboard-content {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 2.5rem 2rem;
+}
+
+.dashboard-content-fullbleed {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+/* The standard page frame. AppShell wraps every dashboard page in this, so
+   pages never set their own page-level max-width or gutters — they just render
+   content (typically a <PageScaffold>). This is what keeps pages from going
+   edge-to-edge or feeling cramped. */
+.dashboard-content-inner {
+  width: 100%;
+  max-width: var(--dashboard-content-max);
+  margin: 0 auto;
+  padding: var(--dashboard-gutter) var(--dashboard-gutter) 4rem;
+}
+
+/* ─── Universal modal system ──────────────────────────────────────────────── */
+
+.modal-card {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 680px;
+  max-height: min(88vh, 760px);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2rem 2.5rem 1.5rem;
+}
+
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.modal-body {
+  padding: 0 2.5rem 2.5rem;
+  max-height: calc(min(88vh, 760px) - 160px);
+  overflow-y: auto;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.25rem 2.5rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* ─── Universal row system ────────────────────────────────────────────────── */
+
+/* A labelled info row — label above value */
+.info-row {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.info-row:last-of-type {
+  border-bottom: none;
+}
+
+.info-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  margin-bottom: 0.375rem;
+}
+
+.info-value {
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+}
+
+/* A clickable action row — sits inside a .action-list */
+.action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;   /* 14px — universal gap between action rows */
+}
+
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--overlay-hover);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+  text-align: left;
+  width: 100%;
+}
+
+.action-row:hover {
+  background: var(--overlay-strong);
+  color: var(--text-primary);
+}
+
+.action-row.danger {
+  color: var(--status-danger-text);
+}
+
+.action-row.danger:hover {
+  background: var(--status-deny-bg);
+  color: var(--status-danger-text);
+}
+
+/* ─── Universal tab bar ───────────────────────────────────────────────────── */
+
+.tab-bar {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0 2.5rem 1rem;
+}
+
+.tab-pill {
+  padding: 0.5rem 1.25rem;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: background 150ms ease, color 150ms ease;
+  cursor: pointer;
+}
+
+.tab-pill:hover {
+  color: var(--text-secondary);
+}
+
+.tab-pill.active {
+  background: var(--overlay-strong);
+  color: var(--text-primary);
+}
+
+/* ─── Universal modal close button ────────────────────────────────────────── */
+
+.modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+
+.modal-close:hover {
+  border-color: var(--text-muted);
+  color: var(--text-primary);
+}
+
+.dashboard-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dashboard-eyebrow {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* THE page title. Every dashboard route wears this on its <h1> — through
+   <PageScaffold title=...> or inline on the page's own control row — so a route
+   names itself in one slot, at one size, in one place.
+
+   It used to be clamp(2.4rem, 3vw, 3.5rem): a 38-56px marketing display title,
+   worn by /settings, /security, /settings/{plan,data,skills,refer,upgrade},
+   /analytics and /admin/*. Meanwhile /memory, /settings/usage and /setup had
+   independently settled on an 18px h1 sitting inline with their filters and
+   actions, and /, /projects, /board and /portfolio had no h1 at all. Three
+   systems, so no two routes introduced themselves the same way.
+
+   This is the inline register the three densest pages already chose, because a
+   dashboard page title is a label for the controls beside it, not a hero: the
+   content is the point and the title should get out of its way. Retuning it here
+   moves every PageScaffold caller at once — that is the reason it is a class. */
+.dashboard-title {
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+/* Sits under the title at a clear step DOWN from it. At 15px it was within a
+   hair of the new 18px title and read as a competing headline. */
+.dashboard-description {
+  max-width: 68ch;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.dashboard-surface {
+  content-visibility: auto;
+  contain-intrinsic-size: 680px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.dashboard-metric {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--overlay-subtle);
+  padding: 1.4rem;
+}
+
+.dashboard-metric-primary {
+  box-shadow: inset 0 1px 0 rgba(16, 185, 129, 0.12);
+}
+
+.dashboard-metric-warning {
+  box-shadow: inset 0 1px 0 rgba(245, 158, 11, 0.12);
+}
+
+.dashboard-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 4rem 1.5rem;
+}
+
+.dashboard-empty-icon {
+  display: flex;
+  height: 4.5rem;
+  width: 4.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(16, 185, 129, 0.18);
+  background: rgba(16, 185, 129, 0.08);
+  color: var(--primary);
+}
+
+.dashboard-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.dashboard-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.dashboard-table th {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.dashboard-table th,
+.dashboard-table td {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 1rem 1.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.dashboard-table tbody tr:hover {
+  background: var(--overlay-subtle);
+}
+
+.dashboard-shell-header-icon {
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  background: transparent;
+}
+
+.dashboard-shell-header-icon:hover {
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+  background: var(--overlay-active);
+}
+
+/* Legacy per-page centering helper. The shell (.dashboard-content-inner) now
+   owns page gutters, so this only constrains width — no padding of its own to
+   avoid double gutters. Prefer rendering plain content inside the shell frame. */
+.dashboard-center {
+  width: 100%;
+  max-width: var(--dashboard-content-max);
+  margin: 0 auto;
+}
+
+.dashboard-card-link {
+  display: block;
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  background: var(--overlay-subtle);
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.dashboard-card-link:hover {
+  border-color: var(--border-strong);
+  background: var(--overlay-hover);
+  transform: translateY(-1px);
+}
+
+.dashboard-card-link:active {
+  transform: translateY(0);
+}
+
+.dashboard-input,
+.dashboard-select,
+.dashboard-textarea {
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  background: var(--overlay-hover);
+  color: var(--text-primary);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.dashboard-input::placeholder,
+.dashboard-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.dashboard-input:hover,
+.dashboard-select:hover,
+.dashboard-textarea:hover {
+  border-color: var(--border-strong);
+}
+
+.dashboard-input:focus-visible,
+.dashboard-select:focus-visible,
+.dashboard-textarea:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: var(--focus-ring);
+}
+
+.dashboard-input[aria-invalid="true"],
+.dashboard-textarea[aria-invalid="true"] {
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.dashboard-kicker {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.ui-press {
+  transition: transform 120ms ease, opacity 120ms ease, background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.ui-press:active {
+  transform: scale(0.99);
+}
+
+.ui-focus {
+  transition: box-shadow 120ms ease, border-color 150ms ease;
+}
+
+@media (max-width: 720px) {
+  .dashboard-topnav {
+    padding: 0 1.25rem;
+    gap: 1rem;
+  }
+
+  .dashboard-content {
+    padding: 1.5rem 1.25rem;
+  }
+
+  .dashboard-content-inner {
+    padding: 1.5rem var(--dashboard-gutter-sm) 3rem;
+  }
+}
+
+/* iOS auto-zooms when a focused form control has a font-size below 16px.
+   Mobile-only: bump dashboard form controls to 16px so focusing them never
+   triggers the page zoom. Scoped to <=767px and to inputs/selects/textareas,
+   so the >=768px desktop type scale is completely unchanged. */
+@media (max-width: 767px) {
+  .dashboard-input,
+  .dashboard-select,
+  .dashboard-textarea,
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="url"],
+  input[type="tel"],
+  input:not([type]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

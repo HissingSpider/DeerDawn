@@ -1,0 +1,159 @@
+# DeerDawn: self-hosted stack.
+#
+#   ./scripts/selfhost/init.sh      # once: writes .env with generated secrets
+#   docker compose up -d            # API + dashboard + Postgres + Redis + Caddy
+#
+# Then open DEERDAWN_PUBLIC_URL (default http://localhost:3000). Full guide:
+# docs/self-hosting.md. HTTPS on your own domain: init.sh --domain, or add
+# infra/selfhost/docker-compose.https.yml to COMPOSE_FILE in .env.
+#
+# This file is for running DeerDawn. The contributor dev sandbox (`make up`,
+# with consumer-sim and fixed dev secrets) is infra/docker-compose.yml.
+
+name: ${COMPOSE_PROJECT_NAME:-deerdawn}
+
+x-restart: &restart
+  restart: unless-stopped
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    <<: [*restart, *logging]
+    environment:
+      POSTGRES_USER: deerdawn
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run scripts/selfhost/init.sh first (POSTGRES_PASSWORD is not set)}
+      POSTGRES_DB: deerdawn
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deerdawn -d deerdawn"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    <<: [*restart, *logging]
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1000"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: ${DEERDAWN_IMAGE_REGISTRY:-ghcr.io/hissingspider}/deerdawn-api:${DEERDAWN_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    <<: [*restart, *logging]
+    # Everything in .env reaches the API (optional integrations, LLM_* and
+    # SELF_HOSTED included); the values below are derived and win over it.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      # This file runs a self-hosted install; it is not a setting.
+      SELF_HOSTED: "true"
+      TELEMETRY_ENABLED: ${TELEMETRY_ENABLED:-false}
+      SIGNUP_MODE: ${SIGNUP_MODE:-invite_only}
+      DATABASE_URL: postgres://deerdawn:${POSTGRES_PASSWORD}@postgres:5432/deerdawn
+      # The Postgres container is on the private compose network: no TLS.
+      DB_DEV_HOSTNAMES: postgres
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?run scripts/selfhost/init.sh first (JWT_SECRET is not set)}
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY:?run scripts/selfhost/init.sh first (ENCRYPTION_MASTER_KEY is not set)}
+      # Full-access machine key the API accepts in X-Api-Key. Named differently
+      # in .env so it is never mistaken for an MCP client's DEERDAWN_API_KEY.
+      DEERDAWN_API_KEY: ${DEERDAWN_SYSTEM_API_KEY:?run scripts/selfhost/init.sh first (DEERDAWN_SYSTEM_API_KEY is not set)}
+      # One public origin serves the dashboard and the API (Caddy routes by path).
+      # DEERDAWN_PUBLIC_URL is the one user-facing setting in .env; the API's
+      # self-hosted code reads it as PUBLIC_URL.
+      PUBLIC_URL: ${DEERDAWN_PUBLIC_URL:-http://localhost:3000}
+      API_BASE_URL: ${DEERDAWN_PUBLIC_URL:-http://localhost:3000}
+      PUBLIC_API_URL: ${DEERDAWN_PUBLIC_URL:-http://localhost:3000}
+      DASHBOARD_URL: ${DEERDAWN_PUBLIC_URL:-http://localhost:3000}
+      # Caddy is the single proxy hop in front of the API.
+      TRUST_PROXY_HOPS: "1"
+      # LLM_API_URL / LLM_API_KEY / LLM_MODEL / LLM_TIMEOUT_MS come from .env
+      # via env_file, so a value left unset there stays unset (not "").
+    # Base schema (idempotent: CREATE ... IF NOT EXISTS), then the normal start
+    # script; the server applies the incremental migrations itself on boot
+    # (src/config/autoMigrate.js). Upgrading = pull a new image + up -d.
+    command: ["sh", "-c", "node scripts/migrate.js && exec ./scripts/start.sh"]
+    extra_hosts:
+      # Lets LLM_API_URL reach a model server on the Docker host, e.g. Ollama:
+      # http://host.docker.internal:11434/v1
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:8080/healthz', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  dashboard:
+    image: ${DEERDAWN_IMAGE_REGISTRY:-ghcr.io/hissingspider}/deerdawn-dashboard:${DEERDAWN_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
+      args:
+        # Inlined into the bundles at build time (analytics gate, setup copy).
+        SELF_HOSTED: "true"
+        TELEMETRY_ENABLED: ${TELEMETRY_ENABLED:-false}
+    <<: [*restart, *logging]
+    environment:
+      # Substituted into the prebuilt bundles at container start.
+      DEERDAWN_PUBLIC_URL: ${DEERDAWN_PUBLIC_URL:-http://localhost:3000}
+      # Where the dashboard's own server reaches the API (never the browser).
+      DEERDAWN_INTERNAL_API_URL: http://api:8080
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/login', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  caddy:
+    image: caddy:2.10-alpine
+    <<: [*restart, *logging]
+    environment:
+      CADDY_SITE_ADDRESS: ${CADDY_SITE_ADDRESS:-:80}
+    ports:
+      # Local / plain-HTTP mode. docker-compose.https.yml replaces this with
+      # 80 + 443 for a real domain.
+      - "${DEERDAWN_BIND_ADDRESS:-127.0.0.1}:${DEERDAWN_HTTP_PORT:-3000}:80"
+    volumes:
+      - ./infra/selfhost/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      dashboard:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

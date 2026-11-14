@@ -1,0 +1,25 @@
+# Dockerfile-specific ignore file: BuildKit reads <Dockerfile>.dockerignore and
+# uses it INSTEAD of the root .dockerignore (which excludes apps/dashboard).
+**/node_modules
+**/.next
+**/.env
+**/.env.*
+.git
+apps/api
+apps/marketing
+apps/consumer-sim
+packages
+packs
+e2e
+docs
+artifacts
+assets
+samples
+sdks
+test-results
+.playwright-cli
+apps/dashboard/tests
+# Unit tests import across apps (../../../marketing, ../../../api), which are
+# not in this context; `next build` typechecks every .ts under src.
+apps/dashboard/src/**/*.test.ts
+apps/dashboard/src/**/*.test.tsx

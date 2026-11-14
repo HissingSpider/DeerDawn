@@ -1,0 +1,41 @@
+# DeerDawn self-hosting: one origin for the dashboard AND the API.
+#
+# Everything the API serves is routed to it by path; everything else goes to
+# the dashboard. One origin is what makes the dashboard's prebuilt bundles work
+# without per-deployment builds (their API base URL is the page's own origin)
+# and what its Content-Security-Policy (`connect-src 'self'`) allows.
+#
+# CADDY_SITE_ADDRESS:
+#   ":80"                    plain HTTP (local / behind your own TLS proxy)
+#   "deerdawn.example.com"   automatic HTTPS via Let's Encrypt (ports 80+443
+#                            must reach this host; see docker-compose.https.yml)
+{
+	# No admin API: the config only ever comes from this file.
+	admin off
+}
+
+{$CADDY_SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	@api {
+		path /api/v1/* /mcp /mcp/* /a2a/* /.well-known/* /healthz /healthz/* /health/* /openapi.json /docs /docs/*
+	}
+
+	handle @api {
+		reverse_proxy api:8080
+	}
+
+	handle {
+		reverse_proxy dashboard:3000 {
+			# The dashboard sends HSTS with includeSubDomains + preload, which is
+			# right for deerdawn.com and wrong for somebody else's domain: it would
+			# pin HTTPS on every subdomain they own. Keep HSTS, scoped to this host.
+			header_down Strict-Transport-Security "max-age=31536000"
+		}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

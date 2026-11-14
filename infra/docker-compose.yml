@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: deerdawn
+      POSTGRES_PASSWORD: password # DEV ONLY — never use in production
+      POSTGRES_DB: deerdawn_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deerdawn -d deerdawn_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+    environment:
+      NODE_ENV: development
+      PORT: 8080
+      DATABASE_URL: postgres://deerdawn:password@postgres:5432/deerdawn_dev # DEV ONLY
+      REDIS_URL: redis://redis:6379 # DEV ONLY
+      DB_DEV_HOSTNAMES: postgres # treat Docker service name as local (no SSL)
+      JWT_SECRET: dev-secret-do-not-use-in-prod # DEV ONLY — never use in production
+      DEERDAWN_API_KEY: dev-key # DEV ONLY
+      # DEV ONLY — a fixed, publicly-known key so local context is encrypted the
+      # same way production's is. Its value is worthless; its PRESENCE is the
+      # point. Encryption is gated on this variable being set, so without it the
+      # encrypt/decrypt path never runs locally and only ever executes in
+      # production — which is precisely how a fully-implemented cipher managed to
+      # never run at all and nobody noticed.
+      ENCRYPTION_MASTER_KEY: "00000000000000000000000000000000000000000000000000000000deadbeef"
+      DOCS_ENABLED: "true"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # EXTRACTION_PROVIDER: anthropic  # uncomment + set ANTHROPIC_API_KEY to switch
+      JWT_EXPIRY: 7d
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ..:/workspace
+    working_dir: /workspace/apps/api
+    command: sh -c "npm run migrate && npm run start"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8080/healthz', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  consumer-sim:
+    build:
+      context: ../apps/consumer-sim
+      dockerfile: Dockerfile
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    environment:
+      API_URL: http://api:8080
+      API_KEY: dev-key
+    depends_on:
+      api:
+        condition: service_healthy
+    command: ["npm", "start"]
+
+volumes:
+  postgres_data:

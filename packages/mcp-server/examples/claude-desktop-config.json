@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "deerdawn": {
+      "command": "npx",
+      "args": ["-y", "@deerdawn/mcp-server@latest"],
+      "env": {
+        "DEERDAWN_API_URL": "http://localhost:8080",
+        "DEERDAWN_API_KEY": "dd_prod_your_api_key_here",
+        "DEERDAWN_ORG_ID": "org-abc123",
+        "DEERDAWN_ENVIRONMENT": "production",
+        "DEERDAWN_CACHE_ENABLED": "true",
+        "DEERDAWN_CACHE_TTL_SECONDS": "60"
+      }
+    }
+  }
+}

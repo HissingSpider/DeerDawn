@@ -1,0 +1,26 @@
+node_modules/
+apps/api/package-lock.json
+.env
+.env.local
+.env.migration
+.DS_Store
+dist/
+# ...except the packs, which are published artifacts rather than build
+# output: the .dawn files are fetched by URL and the tests read the
+# committed bytes, not a rebuild.
+!packs/dist/
+build/
+.next/
+.next-alt/
+.next-plan/
+.turbo/
+coverage/
+*.log
+.gemini-clipboard/
+.vercel
+.deerdawn-sync-ts
+
+# Local, machine-specific tooling — not project source.
+.claude/
+# Local demo/ad-asset scratch (bundles node_modules + an ffmpeg binary).
+demo/

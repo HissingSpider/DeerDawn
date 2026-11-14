@@ -1,0 +1,49 @@
+name: Self-hosting help
+description: Trouble installing, configuring or upgrading a self-hosted DeerDawn.
+labels: [self-hosting]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check [docs/self-hosting.md](https://github.com/HissingSpider/DeerDawn/blob/main/docs/self-hosting.md) first. Never paste secrets: redact API keys, `JWT_SECRET`, `ENCRYPTION_MASTER_KEY` and database passwords.
+  - type: input
+    id: version
+    attributes:
+      label: DeerDawn version
+      description: Release tag or commit you are running.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: OS, Docker and Docker Compose versions, and where it runs (laptop, VM, Kubernetes...).
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Where are you stuck?
+      options:
+        - Running init.sh
+        - Starting the stack (docker compose up)
+        - Database migrations
+        - Signing in to the dashboard
+        - Connecting an AI tool over MCP
+        - Upgrading
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: What you ran, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Output of `docker compose logs api` (or the failing service), with secrets removed.
+      render: shell

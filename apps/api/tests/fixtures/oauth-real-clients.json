@@ -1,0 +1,156 @@
+{
+  "_README": [
+    "REAL published OAuth client metadata, captured verbatim from the live URL in",
+    "`source_url`. Every other OAuth fixture in this repo is invented locally: the",
+    "test writes a redirect_uri into the metadata and then sends that same string",
+    "back, so it is self-consistent by construction and cannot detect a gap between",
+    "what a client PUBLISHES and what it SENDS. That is exactly the gap that made",
+    "every `claude mcp add` a 400 (PR #445): Claude Code declares a PORTLESS",
+    "loopback callback and then arrives with an ephemeral port.",
+    "",
+    "RULE: never hand-edit a value here to make a test pass. These are observations,",
+    "not knobs. If a value no longer matches the live document, the client moved and",
+    "the fix belongs in the server. `npm run check:client-metadata` reports the drift."
+  ],
+  "clients": [
+    {
+      "label": "Claude Code CLI",
+      "source_url": "https://claude.ai/oauth/claude-code-client-metadata",
+      "captured_at": "2026-09-04",
+      "metadata": {
+        "client_id": "https://claude.ai/oauth/claude-code-client-metadata",
+        "client_name": "Claude Code",
+        "client_uri": "https://claude.ai",
+        "redirect_uris": ["http://localhost/callback", "http://127.0.0.1/callback"],
+        "grant_types": ["authorization_code", "refresh_token"],
+        "response_types": ["code"],
+        "token_endpoint_auth_method": "none"
+      }
+    },
+    {
+      "label": "Visual Studio Code",
+      "source_url": "https://vscode.dev/oauth/client-metadata.json",
+      "captured_at": "2026-09-20",
+      "note": [
+        "VS Code uses this URL as its client_id whenever a server advertises",
+        "client_id_metadata_document_supported, and has no DCR fallback to try",
+        "instead. Our CIMD allowlist did not carry https://vscode.dev, so",
+        "/authorize answered every VS Code user a bare 400 invalid_client while",
+        "apps/marketing/public/agent-setup/vscode.md advertised the path."
+      ],
+      "metadata": {
+        "client_name": "Visual Studio Code",
+        "logo_uri": "https://code.visualstudio.com/assets/branding/code-stable.png",
+        "grant_types": ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"],
+        "response_types": ["code"],
+        "token_endpoint_auth_method": "none",
+        "application_type": "native",
+        "client_id": "https://vscode.dev/oauth/client-metadata.json",
+        "client_uri": "https://vscode.dev/product",
+        "redirect_uris": ["http://127.0.0.1:33418/", "https://vscode.dev/redirect"]
+      }
+    }
+  ],
+  "observed_requests": [
+    {
+      "kind": "authorize",
+      "label": "Claude Code CLI connecting to api.deerdawn.com",
+      "observed_at": "2026-09-04",
+      "reported_by": "John, running `claude mcp add` against production",
+      "outcome_before_fix": "400 invalid_request: redirect_uri does not match a registered URI",
+      "note": [
+        "The literal query string off the failing authorize URL. Stored verbatim as",
+        "evidence; the test rewrites only the api.deerdawn.com origin inside",
+        "`resource` to the test issuer, because the audience check is origin-bound",
+        "and is not what this fixture is about."
+      ],
+      "query": "response_type=code&client_id=https%3A%2F%2Fclaude.ai%2Foauth%2Fclaude-code-client-metadata&code_challenge=9lSFeuiyMwgdadpGN-Al0SZ20B_fDHix4wpN8TTYESE&code_challenge_method=S256&redirect_uri=http%3A%2F%2Flocalhost%3A3118%2Fcallback&state=ReOZYOsNh8Ue3z_5fHRdaLJ4Bap-bnv6WRZbkVKL8m4&scope=context%3Aread+context%3Awrite&resource=https%3A%2F%2Fapi.deerdawn.com%2Fmcp%2Fclaude",
+      "production_origin": "https://api.deerdawn.com"
+    },
+    {
+      "kind": "dcr_registration",
+      "label": "Cursor before 3.10 registering by DCR",
+      "observed_at": "2026-09-22",
+      "reported_by": "scan 11 connection scanner, from Cursor forum reports",
+      "source_urls": [
+        "https://forum.cursor.com/t/oauth-redirect-uri-changed-from-cursor-to-http-localhost-for-streamable-http-mcp/165019",
+        "https://forum.cursor.com/t/linear-mcp-auth-fails-with-invalid-redirect-uri-cursor-anysphere-cursor-mcp-oauth-callback/158845"
+      ],
+      "outcome_before_fix": "400 invalid_redirect_uri: redirect_uris must be https (or http loopback) URLs",
+      "note": [
+        "Cursor registers by DCR (it publishes no CIMD document), so the observation is",
+        "the /register body, not an /authorize query. The redirect_uris are verbatim from",
+        "the Cursor forum threads in `source_urls` (Cursor staff confirm the set).",
+        "client_name and the grant/response/auth-method fields are the standard DCR",
+        "fields every MCP client sends and are the only non-observed values here; the",
+        "test does not depend on them.",
+        "Before the 3.10.x loopback rollout the custom-scheme deeplink was Cursor's ONLY",
+        "callback, so refusing it left no way to connect at all."
+      ],
+      "registration_body": {
+        "client_name": "Cursor",
+        "redirect_uris": ["cursor://anysphere.cursor-mcp/oauth/callback"],
+        "token_endpoint_auth_method": "none",
+        "grant_types": ["authorization_code", "refresh_token"],
+        "response_types": ["code"]
+      }
+    },
+    {
+      "kind": "dcr_registration",
+      "label": "Cursor 3.10+ registering by DCR",
+      "observed_at": "2026-09-22",
+      "reported_by": "scan 11 connection scanner, from Cursor forum reports",
+      "source_urls": [
+        "https://forum.cursor.com/t/oauth-redirect-uri-changed-from-cursor-to-http-localhost-for-streamable-http-mcp/165019",
+        "https://forum.cursor.com/t/linear-mcp-auth-fails-with-invalid-redirect-uri-cursor-anysphere-cursor-mcp-oauth-callback/158845"
+      ],
+      "outcome_before_fix": "400 invalid_redirect_uri: redirect_uris must be https (or http loopback) URLs",
+      "note": [
+        "Cursor registers by DCR (it publishes no CIMD document), so the observation is",
+        "the /register body, not an /authorize query. The redirect_uris are verbatim from",
+        "the Cursor forum threads in `source_urls` (Cursor staff confirm the set).",
+        "client_name and the grant/response/auth-method fields are the standard DCR",
+        "fields every MCP client sends and are the only non-observed values here; the",
+        "test does not depend on them.",
+        "3.10.17 through 3.12.x send all three at once; one refused URI failed the whole",
+        "registration, so the two acceptable ones never helped."
+      ],
+      "registration_body": {
+        "client_name": "Cursor",
+        "redirect_uris": [
+          "cursor://anysphere.cursor-mcp/oauth/callback",
+          "https://www.cursor.com/agents/mcp/oauth/callback",
+          "http://localhost:8787/callback"
+        ],
+        "token_endpoint_auth_method": "none",
+        "grant_types": ["authorization_code", "refresh_token"],
+        "response_types": ["code"]
+      }
+    },
+    {
+      "kind": "authorize_after_registration_loss",
+      "label": "A DCR client resending a client_id we issued and then lost",
+      "observed_at": "2026-09-30",
+      "reported_by": "PostHog connector_authorize_rejected, reason=unknown_client, 2026-09-06 to 2026-09-26",
+      "outcome_before_fix": "400 invalid_client: this connector is not registered with DeerDawn. Remove it from your tool and add it again to register a new one.",
+      "evidence": [
+        "distinct_id on these events is mcpcx- + sha256(client_id)[0:32]. Hashing every known metadata URL",
+        "matched only VS Code (mcpcx-4dea5324..., fixed by the vscode.dev allowlist on 09-21). The other five",
+        "client_ids never emitted connector_registration_requested (instrumented since 2026-08-31) and never",
+        "succeeded. One of them (mcpcx-97a63c8c...) was resent 7 times across 09-06, 09-12 and 09-17, three",
+        "times inside 47 seconds: a client replaying an id from its own config. That fits a DCR registration",
+        "issued before #451 (2026-09-06) made registrations durable, while Redis was their only home (the",
+        "Codex loss of 2026-09-05 is the one confirmed instance)."
+      ],
+      "note": [
+        "OBSERVED: the rejection, its retry cadence, the absence of any registration for the id, and the",
+        "loopback host:port Codex sends (127.0.0.1:53046, connector_authorize_requested 2026-09-10).",
+        "RECONSTRUCTED: the client_id VALUE, which no event has ever carried (only its hash), and the",
+        "callback path. The id below has the one shape this server has issued since 2026-06-02, which is",
+        "the only property of it the fix depends on."
+      ],
+      "query": "response_type=code&client_id=mcp_3f9c2a7be41d4c0e8a5b6d7e8f901234&code_challenge=9lSFeuiyMwgdadpGN-Al0SZ20B_fDHix4wpN8TTYESE&code_challenge_method=S256&redirect_uri=http%3A%2F%2F127.0.0.1%3A53046%2Fcallback&state=ReOZYOsNh8Ue3z_5fHRdaLJ4Bap-bnv6WRZbkVKL8m4&scope=context%3Aread+context%3Awrite&resource=https%3A%2F%2Fapi.deerdawn.com%2Fmcp",
+      "production_origin": "https://api.deerdawn.com"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "action_type": "refund.approve",
+  "payload": {
+    "amount": 500,
+    "currency": "USD"
+  },
+  "metadata": {
+    "source": "perf-harness",
+    "region": "us-east-1"
+  }
+}
