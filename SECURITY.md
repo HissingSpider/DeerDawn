@@ -13,7 +13,7 @@ Report it privately, by either:
 1. **GitHub private vulnerability reporting (preferred):** go to the
    [Security tab](https://github.com/HissingSpider/DeerDawn/security/advisories/new)
    of this repository and choose "Report a vulnerability".
-2. **Email:** security@deerdawn.com.
+2. **Email:** john@deerdawn.com.
 
 Please include:
 

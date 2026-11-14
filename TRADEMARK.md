@@ -54,7 +54,7 @@ DeerDawn. Do not alter its colours, proportions or shape.
 ## Questions and permission
 
 If you are not sure whether a use is allowed, or you would like permission
-for something above, email support@deerdawn.com before you go ahead. Please
+for something above, email john@deerdawn.com before you go ahead. Please
 also tell us if you see the Marks being misused.
 
 This policy may be updated from time to time. It is not legal advice and does

@@ -68,7 +68,7 @@ your fork (see [docs/self-hosting.md](docs/self-hosting.md)).
 
 If your organisation cannot accept the AGPL's terms, for example because you
 want to ship a modified DeerDawn without publishing your changes, a commercial
-license is available from the copyright holder. Email support@deerdawn.com.
+license is available from the copyright holder. Email john@deerdawn.com.
 
 ## Why the client packages are MIT
 

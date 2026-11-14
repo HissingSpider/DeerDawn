@@ -97,7 +97,7 @@ DeerDawn is open source.
 
 [LICENSING.md](LICENSING.md) explains exactly what is allowed. Organisations
 that cannot accept the AGPL can get a commercial license: email
-support@deerdawn.com.
+john@deerdawn.com.
 
 ## Contributing
 

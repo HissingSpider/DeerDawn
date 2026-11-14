@@ -120,7 +120,7 @@ license agreements) that You personally know of, and mark it clearly as
 
 If You contribute as part of Your job, or Your employer otherwise has rights
 in Your Contributions, Your employer should sign a Corporate CLA before You
-contribute. Email support@deerdawn.com to arrange one. The Corporate CLA grants
+contribute. Email john@deerdawn.com to arrange one. The Corporate CLA grants
 the same licenses as sections 2 to 4 on behalf of the organisation and names
 the people authorised to contribute for it.
 
