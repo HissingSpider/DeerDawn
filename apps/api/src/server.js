@@ -175,6 +175,9 @@ async function startServer() {
     try {
         await testConnection();
         await runAutoMigration();
+        // Load add-ons now so a broken one is logged at boot. loadAddons never
+        // throws: a bad add-on is skipped, and boot goes on without it.
+        require('./addons/registry').load();
         startScheduler();
         setBootstrapReady();
         console.log('[BOOT] Runtime ready.');

@@ -1492,6 +1492,15 @@ function textOnly(t) {
   return textData(t, { text: String(t) });
 }
 
+// ADD-ON LINES IN THE BRIEF: at most one per enabled add-on, three in all,
+// rendered server-side (addons/lifecycle.js). TEXT ONLY: start_session's
+// structuredContent is the frozen `{ text }` shape, and the lines ride inside
+// that text. Nothing at all when no add-on is switched on.
+async function withAddonLines(actor, text) {
+  const lines = await require('../addons/lifecycle').briefLines(actor);
+  return lines.length ? `${text}\n\nAdd-ons:\n${lines.map((line) => `- ${line}`).join('\n')}` : text;
+}
+
 // MCP-01: required scope per tool. Read tools need context:read; write tools need context:write.
 // New tools MUST be added here or dispatch fails closed.
 const TOOL_SCOPES = {
@@ -1507,6 +1516,9 @@ const TOOL_SCOPES = {
   manage_tasks: 'context:write',
   read_tasks: 'context:read',
   browse_skills: 'context:read',
+  // Add-ons: two fixed tools for every add-on (routes/addons.js, addons/runner.js).
+  read_addon: 'context:read',
+  use_addon: 'context:write',
   start_session: 'context:read',
   list_projects: 'context:read',
   get_context: 'context:read',
@@ -1768,6 +1780,41 @@ async function dispatch(name, args, actor, surface = 'unknown_web', invocation =
       return renderTaskBoard(actor, projectId, open, taskListingOptions(args));
     }
 
+    // ADD-ONS. Both tools go through the one runner the HTTP route uses
+    // (addons/runner.js), so no add-on logic lives here. read_addon passes
+    // via:'read', and the runner refuses a write action on that path whatever
+    // the credential could do. Images come back as MCP image content blocks.
+    case 'read_addon':
+    case 'use_addon': {
+      const { runAddonAction, splitIncludeData, forMcp } = require('../addons/runner');
+      const { isAddonError } = require('../addons/errors');
+      const { args: actionArgs, includeData } = splitIncludeData(args?.args);
+      let result;
+      try {
+        result = await runAddonAction({
+          actor,
+          addonId: String(args?.addon || ''),
+          action: String(args?.action || ''),
+          args: actionArgs,
+          via: name === 'read_addon' ? 'read' : 'write',
+          transport: 'mcp-hosted',
+        });
+      } catch (err) {
+        if (isAddonError(err)) {
+          err.mcpCode = err.status === 403 ? 'permission_denied'
+            : err.status === 404 ? 'resource_not_found'
+              : 'invalid_arguments';
+          err.safeMessage = `${err.code}: ${err.message}`;
+        }
+        throw err;
+      }
+      // Text (and images) only unless include_data: see runner.splitIncludeData.
+      const shaped = forMcp(result, includeData);
+      const reply = textData(shaped.text, { text: shaped.text, ...(shaped.data ? { data: shaped.data } : {}) });
+      for (const image of result.images) reply.content.push({ type: 'image', data: image.base64, mimeType: image.mime });
+      return reply;
+    }
+
     case 'browse_skills': {
       const action = String(args?.action || 'list');
       if (action === 'list') return dispatch('list_skills', args, actor, surface, invocation);
@@ -2021,12 +2068,12 @@ async function dispatch(name, args, actor, surface = 'unknown_web', invocation =
         // context yet" would be both wrong and the exact failure this product
         // exists to prevent.
         const notice = await archivedProjectsNotice();
-        if (notice) return textOnly(withNotice(notice));
-        return textOnly(withNotice('No DeerDawn context yet. Create a project with manage_projects and action "create", or import a CLAUDE.md or AGENTS.md file from the DeerDawn dashboard.'));
+        if (notice) return textOnly(await withAddonLines(actor, withNotice(notice)));
+        return textOnly(await withAddonLines(actor, withNotice('No DeerDawn context yet. Create a project with manage_projects and action "create", or import a CLAUDE.md or AGENTS.md file from the DeerDawn dashboard.')));
       }
       const brief = withNotice(catchup?.text ? `${catchup.text}\n\n${body}` : body);
       const delivered = receipt ? `${receipt}\n\n${brief}` : brief;
-      return textOnly(guessNote ? `${guessNote}\n\n${delivered}` : delivered);
+      return textOnly(await withAddonLines(actor, guessNote ? `${guessNote}\n\n${delivered}` : delivered));
     }
 
     case 'list_projects': {
@@ -3932,6 +3979,11 @@ const CLAUDE_ADVERTISED_TOOL_NAMES = new Set([
   'manage_tasks',
   'browse_skills',
   'build_subagent_brief',
+  // Claude only: the ChatGPT app was approved against a scanned tool list, so
+  // the two add-on tools stay off ADVERTISED_TOOL_NAMES (still dispatchable
+  // there) until a resubmission is decided.
+  'read_addon',
+  'use_addon',
 ]);
 
 const GROUPED_OUTPUT = {
@@ -4160,6 +4212,36 @@ const TOOLS = [
       },
     },
     annotations: { title: 'Browse Shared Skills', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    outputSchema: GROUPED_OUTPUT,
+  },
+  {
+    name: 'read_addon',
+    description: 'Run a read action of an enabled add-on, such as listing its records. Call action "help" first to see its actions and argument shapes. Reads only the caller\'s own add-on data and does not create, change, or delete anything.',
+    inputSchema: {
+      type: 'object',
+      required: ['addon', 'action'],
+      properties: {
+        addon: { type: 'string', description: 'Add-on id, e.g. "wardrobe".' },
+        action: { type: 'string', description: 'A read action, or "help".' },
+        args: { type: 'object', description: 'Arguments for the action (see help). include_data: true adds the structured result.' },
+      },
+    },
+    annotations: { title: 'Read Add-on', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    outputSchema: GROUPED_OUTPUT,
+  },
+  {
+    name: 'use_addon',
+    description: 'Run any action of an enabled add-on, including writes that create, update or permanently delete the caller\'s own add-on records. Call read_addon with action "help" first for the actions and argument shapes.',
+    inputSchema: {
+      type: 'object',
+      required: ['addon', 'action'],
+      properties: {
+        addon: { type: 'string', description: 'Add-on id, e.g. "wardrobe".' },
+        action: { type: 'string', description: 'The action to run.' },
+        args: { type: 'object', description: 'Arguments for the action (see help). include_data: true adds the structured result.' },
+      },
+    },
+    annotations: { title: 'Use Add-on', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     outputSchema: GROUPED_OUTPUT,
   },
   {

@@ -66,6 +66,8 @@ const EXPECTED_TOOLS = [
 const EXPECTED_CLAUDE_TOOLS = [
   'start_session', 'recall', 'manage_projects', 'manage_memory', 'read_tasks',
   'manage_tasks', 'browse_skills', 'build_subagent_brief',
+  // Add-ons (Claude catalog only; the ChatGPT list is unchanged).
+  'read_addon', 'use_addon',
 ];
 
 const mcpSource = fs.readFileSync(path.join(apiRoot, 'src/routes/mcp.js'), 'utf8');
@@ -179,7 +181,7 @@ test('Claude catalog separates genuinely read-only retrieval tools from writes',
   assert.strictEqual(readTasks.annotations.destructiveHint, false);
   assert.ok(!readTasks.inputSchema.properties.action, 'read_tasks has no mutation selector');
 
-  for (const name of ['recall', 'browse_skills', 'build_subagent_brief']) {
+  for (const name of ['recall', 'browse_skills', 'build_subagent_brief', 'read_addon']) {
     const tool = tools.find((candidate) => candidate.name === name);
     assert.strictEqual(tool.annotations.readOnlyHint, true, `${name} is side-effect-free on the Claude catalog`);
     assert.strictEqual(tool.annotations.destructiveHint, false, `${name} cannot alter stored data`);
@@ -188,8 +190,8 @@ test('Claude catalog separates genuinely read-only retrieval tools from writes',
 
   assert.strictEqual(
     tools.filter((tool) => tool.annotations.readOnlyHint).length,
-    4,
-    'Claude directory should show a balanced 4-read/4-write catalog',
+    5,
+    'Claude directory should show a balanced 5-read/5-write catalog',
   );
 
   const manageTasks = tools.find((tool) => tool.name === 'manage_tasks');

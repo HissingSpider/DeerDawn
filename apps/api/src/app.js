@@ -481,6 +481,8 @@ app.use(A2A_BASE_PATH, mcpUnauthenticatedIpLimiter, mcpToolLimiter, a2aRoutes);
 
 // ── Context sync routes ───────────────────────────────────────────────────────
 app.use('/api/v1/context', contextSyncRoutes);
+// Add-ons: catalog, actions, attachments, upload links (routes/addons.js).
+app.use('/api/v1/addons', apiLimiter, require('./routes/addons'));
 app.use('/api/v1/context/integrations', contextIntegrationsRoutes);
 app.use('/api/v1/context/userscript', contextUserscriptRoutes);
 if (process.env.NODE_ENV !== 'production') app.use('/dashboard', contextDashboardRoutes);

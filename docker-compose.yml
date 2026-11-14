@@ -92,6 +92,10 @@ services:
     # script; the server applies the incremental migrations itself on boot
     # (src/config/autoMigrate.js). Upgrading = pull a new image + up -d.
     command: ["sh", "-c", "node scripts/migrate.js && exec ./scripts/start.sh"]
+    volumes:
+      # Add-on attachments. ADDON_STORAGE_DIR defaults to /data/addons when
+      # SELF_HOSTED; set ADDON_S3_* in .env to use an object store instead.
+      - addon_data:/data/addons
     extra_hosts:
       # Lets LLM_API_URL reach a model server on the Docker host, e.g. Ollama:
       # http://host.docker.internal:11434/v1
@@ -155,5 +159,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  # Add-on attachments (photos), stripped of EXIF and resized on the way in.
+  addon_data:
   caddy_data:
   caddy_config:

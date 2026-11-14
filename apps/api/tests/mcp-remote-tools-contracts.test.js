@@ -278,6 +278,8 @@ test('destructive hints match tools that can replace existing environment state'
     // is true — and it is the honest reason the answer must be supplied with it.
     'resolve_open_question',
     'cleanup_context',
+    // An add-on's write actions include permanent deletes of its records.
+    'use_addon',
     // get_workspace_overview, get_workspace_entities and get_next_best_context
     // are deliberately absent. All three are reads whose only write is an
     // additive selection counter, and all three are reached through recall,
@@ -368,7 +370,9 @@ test('read-only tools suppress every write, on every catalog, so their hints are
   // get_portfolio is a pure read: it calls portfolioService and writes nothing,
   // so it carries the read-only annotation and the wrapper suppresses telemetry
   // for it exactly as it does for recall, which is how it is normally reached.
-  const READ_ONLY = new Set(['read_tasks', 'recall', 'get_portfolio', 'browse_skills', 'build_subagent_brief']);
+  // read_addon: the runner refuses every write action on its path and the
+  // tool writes nothing else (addons/runner.js, via:'read').
+  const READ_ONLY = new Set(['read_tasks', 'recall', 'get_portfolio', 'browse_skills', 'build_subagent_brief', 'read_addon']);
   for (const name of callableToolDefs()) {
     const block = toolBlock(name);
     if (READ_ONLY.has(name)) {

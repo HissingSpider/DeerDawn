@@ -1647,6 +1647,24 @@ async function fetchAPI(
   return res.json();
 }
 
+// FOR lib/addonsApi.ts. The JSON path (fetchAPI) for ordinary calls, and a raw
+// one for the two things fetchAPI cannot carry: a multipart upload (the
+// browser must set its own Content-Type boundary) and a binary response
+// (attachment bytes, read as a Blob). Both send the same auth, workspace and
+// CSRF headers every other request does.
+export function requestApi<T = any>(endpoint: string, options: RequestInit & { timeoutMs?: number } = {}): Promise<T> {
+  return fetchAPI(endpoint, options);
+}
+
+export async function requestApiRaw(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  const headers = await getHeaders(options, endpoint);
+  if (typeof FormData !== 'undefined' && options.body instanceof FormData) delete headers['Content-Type'];
+  const res = await executeFetch(endpoint, { ...options, timeoutMs: 60_000 }, headers);
+  if (!res.ok) return throwApiError(res);
+  noteSuccessfulWrite(endpoint, options.method);
+  return res;
+}
+
 // Web tools whose context sync runs via an installable browser userscript
 // (served from /api/v1/context/userscript?tool=...). Gemini/Perplexity have no
 // remote-MCP path, so the userscript is their only integration route.

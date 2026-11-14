@@ -38,12 +38,16 @@ COPY package.json package-lock.json .npmrc ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/shared-context/package.json ./packages/shared-context/
 COPY packages/tool-adapters/package.json ./packages/tool-adapters/
+COPY packages/addon-kit/package.json ./packages/addon-kit/
 RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
 
 # Copy API source and shared packages
 COPY apps/api/ ./apps/api/
 COPY packages/shared-context/ ./packages/shared-context/
 COPY packages/tool-adapters/ ./packages/tool-adapters/
+# The add-on interface and the in-repo add-ons (addons/*/addon.json), read at boot.
+COPY packages/addon-kit/ ./packages/addon-kit/
+COPY addons/ ./addons/
 
 
 # Final stage for app image
@@ -60,6 +64,11 @@ WORKDIR /workspace/apps/api
 
 # Make startup script executable (as root, before dropping privileges)
 RUN chmod +x scripts/start.sh
+
+# Add-on file storage on a self-hosted install (ADDON_STORAGE_DIR defaults to
+# /data/addons there). Created owned by `node` so a named volume mounted on it
+# inherits a directory the API can write.
+RUN mkdir -p /data/addons && chown -R node:node /data
 
 # Drop to the non-root user for the running container.
 USER node

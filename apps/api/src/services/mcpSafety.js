@@ -236,8 +236,23 @@ const HELD_UNADVERTISED_PROPERTIES = {
   },
 };
 
+// FREE-FORM OBJECTS, BY NAME. read_addon / use_addon carry `args`, whose shape
+// is each add-on's own and is validated by the add-on runner against that
+// action's JSON Schema (apps/api/src/addons/runner.js). Hardening it to "no
+// properties, additionalProperties false" would refuse every call. Only a
+// top-level property named here is opened, and everything inside it is still
+// walked: prototype keys refused, strings capped and checked for control
+// characters, arrays capped, depth bounded by MAX_DEPTH.
+const OPEN_OBJECT_FIELDS = new Set(['args']);
+const OPEN_STRING_LIMIT = 20_000;
+const OPEN_SCHEMA = { additionalProperties: true, maxLength: OPEN_STRING_LIMIT, maxItems: 500 };
+OPEN_SCHEMA.items = OPEN_SCHEMA;
+
 function hardenInputSchema(schema, fieldName = '', depth = 0) {
   if (!schema || typeof schema !== 'object' || depth > MAX_DEPTH) return schema;
+  if (depth === 1 && OPEN_OBJECT_FIELDS.has(fieldName) && schema.type === 'object' && !schema.properties) {
+    return { ...schema, additionalProperties: true };
+  }
   const hardened = { ...schema };
   if (schema.type === 'object' || schema.properties) {
     hardened.type = 'object';
@@ -343,6 +358,10 @@ function validateNode(value, schema, path = 'arguments', depth = 0) {
     const properties = schema.properties || {};
     for (const [key, child] of Object.entries(value)) {
       if (!Object.prototype.hasOwnProperty.call(properties, key)) {
+        if (schema.additionalProperties === true) {
+          validateNode(child, OPEN_SCHEMA, `${path}.${key}`, depth + 1);
+          continue;
+        }
         throw invalidArguments(`${path}.${key} is not a supported argument`);
       }
       validateNode(child, properties[key], `${path}.${key}`, depth + 1);

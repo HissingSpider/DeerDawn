@@ -53,12 +53,12 @@ describe('the README against the server it documents', () => {
     // The table in "Session memory tools" states these three numbers. They are
     // the first thing a reader checks against their own tool list, so they are
     // pinned to the function rather than to a memory of it.
-    expect(listTools({ authed: true, hasSkills: false })).toHaveLength(6);
-    expect(listTools({ authed: true, hasSkills: true })).toHaveLength(8);
+    expect(listTools({ authed: true, hasSkills: false })).toHaveLength(8);
+    expect(listTools({ authed: true, hasSkills: true })).toHaveLength(10);
     expect(listTools({ authed: false, hasSkills: false })).toHaveLength(10);
 
-    expect(README).toMatch(/\| Local, signed in \| 6:/);
-    expect(README).toMatch(/which makes 8/);
-    expect(README).toMatch(/\| Local, signed out \| the above plus 4 setup tools/);
+    expect(README).toMatch(/\| Local, signed in \| 8:/);
+    expect(README).toMatch(/which makes 10/);
+    expect(README).toMatch(/\| Local, signed out \| the 6 core tools plus 4 setup tools/);
   });
 });

@@ -206,6 +206,9 @@ async function runAutoMigration() {
     // workspace_members is owned by workspaceService, and the hosted-connection
     // stamp below reads it.
     await require('../services/workspaceService').ensureSchema();
+    // The add-on tables (addons/schema.js): new, so created with their indexes
+    // while empty, and skipped entirely once they exist.
+    await require('../addons/schema').ensureAddonSchema();
 
     const client = await db.pool.connect();
     try {

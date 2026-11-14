@@ -1176,6 +1176,50 @@ export class DeerdawnClient {
     return data;
   }
 
+  // ── Add-ons ────────────────────────────────────────────────────────────────
+  // read_addon / use_addon forward here: the API runs every add-on action
+  // (apps/api/src/addons/runner.js), so no add-on logic lives in this package.
+  // A refusal is RETURNED, not thrown, so the tool can show the server's own
+  // sentence ("switch it on at /addons") instead of an HTTP status.
+  async runAddonAction(addon: string, action: string, args: Record<string, unknown>, via: 'read' | 'write'): Promise<
+    | { ok: true; result: { text: string; data: Record<string, unknown> | null; images: { mime: string; base64: string }[] } }
+    | { ok: false; status: number; error: string; message: string }
+  > {
+    const res = await this.client.post(
+      `/api/v1/addons/${encodeURIComponent(addon)}/actions/${encodeURIComponent(action)}`,
+      { args, via },
+      { headers: { 'x-deerdawn-transport': 'mcp-local' }, validateStatus: (status) => status < 500 && status !== 401 },
+    );
+    if (res.status >= 200 && res.status < 300) {
+      const body = res.data || {};
+      return {
+        ok: true,
+        result: {
+          text: typeof body.text === 'string' ? body.text : '',
+          data: body.data && typeof body.data === 'object' ? body.data : null,
+          images: Array.isArray(body.images) ? body.images : [],
+        },
+      };
+    }
+    const body = res.data || {};
+    return {
+      ok: false,
+      status: res.status,
+      error: String(body.error || `http_${res.status}`),
+      message: String(body.message || body.error || `The add-on request failed (${res.status}).`),
+    };
+  }
+
+  /** The brief's add-on lines; [] on any failure — a brief never waits on add-ons. */
+  async addonBriefLines(): Promise<string[]> {
+    try {
+      const { data } = await this.client.get('/api/v1/addons/brief-lines', { timeout: 2000 });
+      return Array.isArray(data?.lines) ? data.lines.filter((line: unknown) => typeof line === 'string').slice(0, 3) : [];
+    } catch {
+      return [];
+    }
+  }
+
   // ── Shared skills ──────────────────────────────────────────────────────────
   async listSkills(projectId?: string): Promise<SkillMeta[]> {
     const params: Record<string, string> = {};

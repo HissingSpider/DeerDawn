@@ -3,6 +3,7 @@ import type { DeerdawnClient } from '../client.js';
 import { contextGraphTools, handleContextGraphTool } from './context-graph.js';
 import { contextSyncTools, handleContextSyncTool } from './context-sync.js';
 import { authTools, handleAuthTool } from './auth.js';
+import { addonTools, handleAddonTool, ADDON_TOOL_NAMES } from './addons.js';
 import { loadSavedApiKey } from '../auth.js';
 import { announceCredentialRenewed, liveCredential, consumePinnedEnvKeyNotice, consumeCredentialSwapNotice } from '../auth-state.js';
 import { AUTH_EXPIRED_SENTINEL } from '../utils/errors.js';
@@ -53,6 +54,14 @@ const CORE_TIER = new Set([
   'build_subagent_brief',
 ]);
 
+/**
+ * Add-ons: two fixed tools for every add-on (tools/addons.ts). Always
+ * advertised once signed in: whether this workspace has an add-on switched on
+ * is not known to listTools without a request, and `help` answers "switched
+ * off" honestly. Adding these two was decided explicitly against the budget.
+ */
+const ADDON_TIER = new Set(['read_addon', 'use_addon']);
+
 /** Advertised only when the workspace has synced skills. */
 const SKILLS_TIER = new Set(['browse_skills', 'manage_skills']);
 
@@ -99,6 +108,11 @@ const ADVERTISED_METADATA: Record<string, { title: string; readOnlyHint: boolean
   build_subagent_brief: { title: 'Build Worker Brief', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   browse_skills: { title: 'Browse Shared Skills', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   manage_skills: { title: 'Manage Shared Skills', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  // read_addon is read-only on the hosted connector and NOT here, for the
+  // reason at the top of this table: this runtime records a telemetry event on
+  // every call. It destroys nothing. use_addon can delete add-on records.
+  read_addon: { title: 'Read Add-on', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  use_addon: { title: 'Use Add-on', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
 };
 
 export interface SurfaceState {
@@ -112,7 +126,7 @@ export interface SurfaceState {
 
 /** Keep tools/list compact even before auth and workspace state finish loading. */
 export function listTools(state?: Partial<SurfaceState>) {
-  const all = [...authTools, ...contextSyncTools, ...contextGraphTools];
+  const all = [...authTools, ...contextSyncTools, ...contextGraphTools, ...addonTools];
   const { authed = false, hasSkills = false } = state ?? {};
 
   return all.filter((tool) => {
@@ -122,6 +136,7 @@ export function listTools(state?: Partial<SurfaceState>) {
 
     if (SETUP_TIER.has(name)) return !authed;
     if (CORE_TIER.has(name)) return true;
+    if (ADDON_TIER.has(name)) return state ? authed : true;
     if (SKILLS_TIER.has(name)) return state ? hasSkills : true;
 
     return false;
@@ -288,6 +303,10 @@ async function dispatchToolCall(name: string, args: any, getClient: () => Promis
 
     if (name === 'inspect_context_graph') {
       return await handleContextGraphTool(name, resolvedArgs, client);
+    }
+
+    if (ADDON_TOOL_NAMES.has(name)) {
+      return await handleAddonTool(name, resolvedArgs, client);
     }
 
     throw new Error(`Unknown tool: ${name}`);

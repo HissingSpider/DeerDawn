@@ -1686,6 +1686,16 @@ router.delete('/members/:userId', async (req, res) => {
     await hostedConnections.revokeForPersonInWorkspace(orgId, connectionIdentities)
       .catch((err) => console.error(`[TEAMS] second connection sweep failed for ${req.params.userId}: ${err.message}`));
 
+    // Their add-on data here is personal (nobody else can read it, owners
+    // included), so after removal nobody could: erased with its files. Never
+    // undoes the removal; the counts go on the audit row.
+    const addonErasure = await require('../../addons/lifecycle')
+      .eraseMemberAddonData(orgId, req.params.userId)
+      .catch((err) => {
+        console.error(`[TEAMS] add-on data erasure failed for ${req.params.userId}: ${err.message}`);
+        return { error: err.message };
+      });
+
     // A shortfall of seats may have been resolved by this departure.
     billingNotices.clearSeatShortfallIfResolved(orgId);
 
@@ -1693,6 +1703,7 @@ router.delete('/members/:userId', async (req, res) => {
       user_id: req.params.userId,
       keys_revoked: revokedKeys.rowCount || 0,
       connections_revoked: connectionsRevoked.revoked.connections,
+      addon_data_erased: addonErasure,
       ...(personalWorkspace ? { rehomed_to: personalWorkspace } : {}),
       ...(carriedTo ? {
         personal_projects_moved: projectsMoved.length,

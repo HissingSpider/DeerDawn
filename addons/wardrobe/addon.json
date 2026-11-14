@@ -1,0 +1,21 @@
+{
+  "id": "wardrobe",
+  "name": "Wardrobe",
+  "version": "0.1.0",
+  "description": "Photograph the clothes you own, keep notes on each piece, let your AI put outfits together, and save the good ones under named styles.",
+  "kind": "server",
+  "collections": {
+    "items": { "schema": "schemas/item.json", "attachments": true },
+    "outfits": { "schema": "schemas/outfit.json" },
+    "styles": { "schema": "schemas/style.json" },
+    "profile": { "schema": "schemas/profile.json" }
+  },
+  "skill": "SKILL.md",
+  "brief_line": "Wardrobe: {{items.count}} items, {{outfits.count}} outfits",
+  "views": [
+    { "id": "closet", "type": "gallery", "collection": "items" },
+    { "id": "outfits", "type": "gallery", "collection": "outfits" },
+    { "id": "styles", "type": "table", "collection": "styles" }
+  ],
+  "default_visibility": "personal"
+}

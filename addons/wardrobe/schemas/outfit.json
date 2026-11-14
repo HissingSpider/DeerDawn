@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Wardrobe outfit",
+  "type": "object",
+  "required": ["ref", "name", "item_ids", "verdict"],
+  "properties": {
+    "ref": { "type": "string", "maxLength": 12 },
+    "name": { "type": "string", "maxLength": 120 },
+    "item_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 12 },
+    "styles": { "type": "array", "items": { "type": "string", "maxLength": 60 }, "maxItems": 6 },
+    "occasions": { "type": "array", "items": { "type": "string", "maxLength": 60 }, "maxItems": 6 },
+    "seasons": { "type": "array", "items": { "enum": ["spring", "summer", "autumn", "winter"] }, "maxItems": 4 },
+    "temp_min": { "type": ["number", "null"] },
+    "temp_max": { "type": ["number", "null"] },
+    "verdict": { "enum": ["loved", "fine", "rejected"] },
+    "reason": { "type": ["string", "null"], "maxLength": 500 },
+    "notes": { "type": ["string", "null"], "maxLength": 2000 },
+    "made_by": { "enum": ["agent", "user"] },
+    "request": { "type": ["string", "null"], "maxLength": 500, "description": "What the user asked for when this was proposed" },
+    "cover_attachment_id": { "type": ["string", "null"] },
+    "worn_dates": { "type": "array", "items": { "type": "string", "maxLength": 10 } }
+  }
+}

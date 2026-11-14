@@ -1,0 +1,11 @@
+{
+  "name": "@deerdawn/addon-kit",
+  "version": "0.1.0",
+  "license": "MIT",
+  "description": "The DeerDawn add-on interface: the manifest schema, a validator, and typedefs for add-on actions.",
+  "private": true,
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  }
+}

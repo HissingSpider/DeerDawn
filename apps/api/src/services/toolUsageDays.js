@@ -43,6 +43,7 @@ const KNOWN_TOOL_NAMES = Object.freeze(new Set([
     // grouped
     'start_session', 'recall', 'manage_projects', 'manage_memory', 'manage_tasks',
     'read_tasks', 'browse_skills', 'manage_skills', 'build_subagent_brief',
+    'read_addon', 'use_addon',
     // legacy and per-action
     'archive_project', 'cleanup_context', 'create_project', 'export_trail', 'import_trail',
     'find_known_paths', 'get_context', 'get_next_best_context', 'get_portfolio',

@@ -10,6 +10,7 @@ depends on the directory a file lives in.
 | `packages/mcp-server` | [MIT](packages/mcp-server/LICENSE) | Runs on your machine; published to npm as `@deerdawn/mcp-server` |
 | `packages/shared-context` | [MIT](packages/shared-context/LICENSE) | Bundled into the published MCP server |
 | `packages/tool-adapters` | [MIT](packages/tool-adapters/LICENSE) | Client-side tool profiles; kept with the other client code |
+| `packages/addon-kit` | [MIT](packages/addon-kit/LICENSE) | The add-on interface: manifest schema, validator, types (see [docs/add-ons.md](docs/add-ons.md)) |
 | `sdks/` | MIT (see each SDK's `LICENSE`) | Client libraries |
 
 A `LICENSE` file inside a directory applies to that directory. Everything else
@@ -78,6 +79,22 @@ tools to DeerDawn never puts copyleft obligations on your machine, your
 employer, or a package you build on top of it. `packages/shared-context` is
 compiled into the published `@deerdawn/mcp-server`, so it has to carry the same
 license or the npm package would inherit the AGPL.
+
+## Add-ons
+
+DeerDawn is getting an add-on system. Two things about its licensing are
+settled now, so nobody has to guess later:
+
+- The add-on interface (the manifest format, its schemas, and any helper
+  package published for writing add-ons) will be MIT, like the other client
+  packages.
+- An add-on that is only data (a manifest, record schemas, instructions for
+  the agent, view definitions) is yours to license however you like. DeerDawn
+  reads it; nothing in it is linked into the server.
+
+An add-on that ships code which runs inside the AGPL-licensed server is a
+different case. Treat it as covered by the AGPL unless you have a commercial
+license.
 
 ## Trademarks
 

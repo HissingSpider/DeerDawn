@@ -1,0 +1,18 @@
+{
+  "id": "notes-example",
+  "name": "Notes (example)",
+  "version": "0.1.0",
+  "description": "A minimal declarative add-on: one collection of short notes, no code. Read it as documentation for writing your own.",
+  "kind": "declarative",
+  "collections": {
+    "notes": { "schema": "schemas/note.json", "attachments": true }
+  },
+  "skill": "SKILL.md",
+  "brief_line": "Notes: {{notes.count}} saved",
+  "views": [
+    { "id": "all", "type": "table", "collection": "notes", "title": "All notes", "fields": ["title", "tags", "pinned"] },
+    { "id": "cards", "type": "gallery", "collection": "notes", "title": "Cards", "title_field": "title" },
+    { "id": "detail", "type": "detail", "collection": "notes", "fields": ["title", "body", "tags", "pinned"] }
+  ],
+  "default_visibility": "personal"
+}

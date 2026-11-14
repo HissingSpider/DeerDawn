@@ -37,6 +37,16 @@ describe('advertised tool surface', () => {
     expect(payloadTokens(STEADY)).toBeLessThan(4000);
   });
 
+  it('advertises the two add-on tools once signed in, and nothing per add-on', () => {
+    // Decided 2026-11-13, against this budget: read_addon + use_addon cost ~396
+    // tokens (steady state 2,534 -> 2,930) and stay that size however many
+    // add-ons exist, because each add-on's actions come from `help` on demand.
+    // A third add-on tool, or per-add-on tools, needs the same decision again.
+    expect(names(STEADY)).toEqual(expect.arrayContaining(['read_addon', 'use_addon']));
+    expect(names(FIRST_RUN)).not.toContain('use_addon');
+    expect(names(STEADY).filter((name) => name.endsWith('_addon'))).toHaveLength(2);
+  });
+
   it('keeps the steady-state surface small enough to choose from', () => {
     expect(names(STEADY).length).toBeLessThanOrEqual(15);
   });
@@ -62,6 +72,8 @@ describe('advertised tool surface', () => {
       ...dispatchLine.split(',').map((s) => s.trim().replace(/^'|'$/g, '')).filter(Boolean),
       'get_auth_status', 'get_setup_status', 'apply_setup', 'complete_setup',
       'inspect_context_graph',
+      // Dispatched through ADDON_TOOL_NAMES, built from the same array listTools reads.
+      'read_addon', 'use_addon',
     ]);
 
     const everyAdvertisableName = names(); // undefined state => the full list
@@ -133,6 +145,8 @@ describe('advertised tool surface', () => {
       'manage_memory',
       'manage_tasks',
       'manage_skills',
+      // An add-on's write actions include permanent deletes of its records.
+      'use_addon',
     ]);
 
     for (const tool of listTools()) {

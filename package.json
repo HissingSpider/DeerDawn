@@ -11,6 +11,7 @@
     "apps/api",
     "apps/consumer-sim",
     "apps/dashboard",
+    "packages/addon-kit",
     "packages/mcp-server",
     "packages/shared-context",
     "packages/tool-adapters"
@@ -19,9 +20,12 @@
     "js-cookie": "3.0.7",
     "postcss": "8.5.24",
     "esbuild": "0.28.0",
-    "sharp": "^0.35.0",
+    "sharp": "$sharp",
     "@opentelemetry/propagator-jaeger": "^2.9.0",
     "zod": "^4.6.7"
+  },
+  "dependencies": {
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "esbuild": "0.28.0"

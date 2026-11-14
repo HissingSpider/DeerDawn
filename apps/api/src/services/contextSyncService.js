@@ -6133,6 +6133,9 @@ async function exportContext(actor, { projectIds = null, profile = false, privat
       edges: workspaceGraph?.edges || [],
     },
     skills,
+    // This person's add-on records (decrypted) and a listing of their files.
+    // Personal to them, so only ever their own. See addons/lifecycle.js.
+    addons: await require('../addons/lifecycle').exportForActor(actor),
   };
 }
 

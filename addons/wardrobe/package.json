@@ -1,0 +1,14 @@
+{
+  "name": "@deerdawn/addon-wardrobe",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Wardrobe: the first official DeerDawn server add-on.",
+  "license": "AGPL-3.0-only",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test tests/"
+  },
+  "dependencies": {
+    "sharp": "^0.35.4"
+  }
+}

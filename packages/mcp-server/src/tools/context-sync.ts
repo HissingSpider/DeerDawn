@@ -2934,7 +2934,16 @@ export async function handleContextSyncTool(
           }
           return noContextResponse();
         }
-        return { content: [{ type: 'text', text: sessionText }] };
+        // PARITY with the hosted start_session's withAddonLines: at most three
+        // add-on lines, rendered by the API, text only. Nothing when no add-on
+        // is switched on, and nothing (never an error) when the call fails.
+        const addonLines = typeof (client as any).addonBriefLines === 'function'
+          ? await client.addonBriefLines().catch(() => [] as string[])
+          : [];
+        const withAddons = addonLines.length
+          ? `${sessionText}\n\nAdd-ons:\n${addonLines.map((line) => `- ${line}`).join('\n')}`
+          : sessionText;
+        return { content: [{ type: 'text', text: withAddons }] };
       }
 
       case 'get_context': {

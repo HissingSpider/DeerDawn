@@ -272,6 +272,9 @@ const MENU_SECTIONS: { heading: string; links: MenuLink[] }[] = [
     heading: 'Workspace',
     links: [
       { href: '/memory', label: 'Memory', icon: <LayersIcon /> },
+      // In the menu, not PRIMARY_NAV: the primary nav's desktop layout stays as
+      // it is, and add-ons are switched on once and then used through the agent.
+      { href: '/addons', label: 'Add-ons', icon: <BoxIcon /> },
       { href: '/settings/usage', label: 'Usage & value', icon: <ChartIcon /> },
       { href: '/settings/skills', label: 'Shared Skills', icon: <ScrollIcon /> },
       { href: '/settings/team', label: 'Team', icon: <LayersIcon /> },

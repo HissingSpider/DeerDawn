@@ -409,7 +409,10 @@ test('the two dispatchers still cover the same tool names', () => {
   const remoteNames = new Set([...catalog.matchAll(/^\s{4}name: '([a-z_]+)'/gm)].map((m) => m[1]));
   assert.ok(remoteNames.size > 20, `expected a full remote catalog, saw ${remoteNames.size}`);
 
-  const rawLocal = fs.readFileSync(LOCAL, 'utf8');
+  // The local add-on tools live in their own module (tools/addons.ts), which
+  // forwards to the same API route the hosted runner serves.
+  const rawLocal = fs.readFileSync(LOCAL, 'utf8')
+    + fs.readFileSync(path.join(ROOT, 'packages/mcp-server/src/tools/addons.ts'), 'utf8');
   const missing = [...remoteNames].filter((n) => !rawLocal.includes(`'${n}'`));
   assert.deepEqual(
     missing.filter((n) => !DELIBERATE_REMOTE_ONLY.has(n)),

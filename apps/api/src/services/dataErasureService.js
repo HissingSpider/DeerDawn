@@ -34,6 +34,10 @@ const { normalizeRole, eraseProjectGraph } = require('./workspaceService');
 // rehomeResidentsBeforeClose / lockAndConfirmSoleOccupant at call time.
 const workspaceService = require('./workspaceService');
 
+// Required lazily: the add-on platform pulls in workspaceService, which this
+// module also loads, and the loader reads the addons/ directory.
+const addonLifecycle = () => require('../addons/lifecycle');
+
 // Tables keyed by owner_key (verified against information_schema).
 const OWNER_KEY_TABLES = [
     'context_graph_edges',
@@ -794,6 +798,11 @@ async function purgeOwnerData(ownerKey, {
     for (const table of PROJECT_SCOPED_TABLES) {
         deleted[table] = await deleteByOwnerProjects(query, table, ownerKey);
     }
+    // ADD-ON DATA, for every add-on at once (apps/api/src/addons/lifecycle.js).
+    // The rows go now, inside the caller's transaction when it has one; the
+    // FILES go in runSideEffects below, after any COMMIT, because a deleted
+    // object cannot be rolled back.
+    const addonFileKeys = await addonLifecycle().eraseWorkspaceAddonData(query, ownerKey, deleted);
     const keep = workspaceOnly ? [...new Set((keepMembers || []).filter(Boolean))] : [];
     for (const table of OWNER_KEY_TABLES) {
         deleted[table] = table === 'workspace_members' && keep.length
@@ -881,6 +890,9 @@ async function purgeOwnerData(ownerKey, {
         // Their PERSONAL projects in other people's workspaces, with
         // everything hanging off them. See PERSONAL_PROJECT_DELETES.
         await erasePersonalProjectsElsewhere(query, identities, ownerKey, deleted);
+        // Their add-on data in other people's workspaces: v1 add-on data is
+        // all `personal`, so wherever it lives it is theirs alone.
+        addonFileKeys.push(...await addonLifecycle().erasePersonAddonData(query, userIds, deleted));
         // And their private notes there (scan 33): the home workspace's go with
         // its owner_key sweep above.
         await erasePrivateNodesElsewhere(query, userIds, identities, ownerKey, deleted);
@@ -949,6 +961,10 @@ async function purgeOwnerData(ownerKey, {
             });
         }
         deleted.api_key_cache_invalidated = keyHashes.length;
+        deleted.addon_files_deleted = await addonLifecycle().deleteAddonFiles(addonFileKeys).catch((err) => {
+            console.warn('[ERASURE] add-on file deletion failed:', err.message);
+            return `error:${err.code || err.message}`;
+        });
         const sweep = {};
         deleted.refresh_tokens_revoked = await revokeOwnerRefreshTokens(ownerKey, sweep);
         // On the report, so the caller (and the erasure record) can see that
@@ -1003,6 +1019,9 @@ async function erasePersonData({ userIds = [], identities = [], query = db.query
     const ids = [...new Set([...people, ...identities.filter(Boolean)])];
     await erasePersonalProjectsElsewhere(query, ids, null, deleted);
     await erasePrivateNodesElsewhere(query, people, ids, null, deleted);
+    const addonFileKeys = await addonLifecycle().erasePersonAddonData(query, people, deleted);
+    deleted.addon_files_deleted = await addonLifecycle().deleteAddonFiles(addonFileKeys)
+        .catch((err) => `error:${err.code || err.message}`);
     for (const { label, table, column } of PERSON_KEYED_DELETES) {
         try {
             const r = await query(`DELETE FROM ${table} WHERE ${column} = ANY($1)`, [people], 'org-system');

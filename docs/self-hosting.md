@@ -398,6 +398,7 @@ the annotated template.
 | `SOURCE_CODE_URL` | `https://github.com/HissingSpider/DeerDawn` | Where the dashboard's "Source code" link (Settings) points. DeerDawn's server is AGPL-3.0: if you run a **modified** version that other people use over the network, section 13 requires you to offer them its source, so set this to your fork. Must be an `http(s)://` URL. |
 | `LLM_API_URL`, `LLM_API_KEY`, `LLM_MODEL`, `LLM_EMBEDDING_MODEL`, `LLM_TIMEOUT_MS` | | See [Choosing an LLM](#choosing-an-llm). |
 | `RESEND_API_KEY` | | Outbound email (invitations, password resets). Unset: links go to the API log. |
+| `DEERDAWN_ADDONS`, `ADDON_STORAGE_DIR`, `ADDON_S3_*`, `ADDON_MAX_*`, `LLM_VISION_MODEL` | | Add-ons and where their images are stored (a volume at `/data/addons` by default). See [Add-ons](add-ons.md#running-add-ons-on-your-own-server). |
 | `POSTGRES_PASSWORD` | generated | Password of the bundled Postgres. |
 | `JWT_SECRET` | generated | Signs dashboard sessions. Changing it signs everyone out. |
 | `DEERDAWN_SYSTEM_API_KEY` | generated | A full-access machine key the API accepts in `X-Api-Key`. Keep it private. |

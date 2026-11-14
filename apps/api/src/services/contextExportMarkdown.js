@@ -517,6 +517,9 @@ function bundleRenderers(bundle) {
       out.push('');
     }],
     ...bundleBodyRenderers(bundle),
+    // The person's add-on data. Records are printed as JSON, because their shape
+    // is each add-on's own; files are listed, never embedded.
+    field('addons', (addons, out) => renderAddons(addons, out)),
     // Last, after everything of the person's own workspace, and only when there
     // is something: absent, the document is exactly what it was without it.
     field('other_workspaces', (workspaces, out) => {
@@ -526,6 +529,43 @@ function bundleRenderers(bundle) {
       for (const ws of workspaces) renderClosedWorkspace(ws, out);
     }),
   ];
+}
+
+function renderAddons(addons, out) {
+  const records = Array.isArray(addons?.records) ? addons.records : [];
+  const files = Array.isArray(addons?.attachments) ? addons.attachments : [];
+  const enabled = Array.isArray(addons?.enabled) ? addons.enabled : [];
+  if (!records.length && !files.length && !enabled.length) return;
+  out.push(`## Add-ons (${records.length} records, ${files.length} files)`);
+  out.push('');
+  if (enabled.length) {
+    out.push(`_Switched on in this workspace: ${enabled.join(', ')}._`);
+    out.push('');
+  }
+  const groups = new Map();
+  for (const record of records) {
+    const key = `${record.addon_id} / ${record.collection}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ id: record.id, created_at: record.created_at, updated_at: record.updated_at, data: record.data });
+  }
+  for (const [key, rows] of groups) {
+    out.push(`### ${key} (${rows.length})`);
+    out.push('');
+    const body = JSON.stringify(rows, null, 2);
+    const longest = Math.max(0, ...(body.match(/`+/g) || []).map((run) => run.length));
+    const fence = '`'.repeat(Math.max(3, longest + 1));
+    out.push(`${fence}json`, ...body.split('\n'), fence, '');
+  }
+  if (files.length) {
+    out.push('### Files');
+    out.push('');
+    out.push('_Listed, not embedded. Download each one at its path while signed in._');
+    out.push('');
+    for (const file of files) {
+      out.push(`- ${file.addon_id} / ${file.collection}: ${file.id} (${file.mime}, ${file.bytes} bytes${file.record_id ? `, record ${file.record_id}` : ''}) ${file.download || ''}`.trim());
+    }
+    out.push('');
+  }
 }
 
 function renderContextExportMarkdown(bundle) {

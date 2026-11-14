@@ -262,11 +262,18 @@ What your agent sees in `tools/list` is deliberately small, because every listed
 
 | Server | Listed tools |
 |---|---|
-| Hosted | 7: `start_session`, `recall`, `manage_memory`, `manage_tasks`, `manage_projects`, `browse_skills`, `build_subagent_brief` (the Claude.ai endpoint adds a read-only `read_tasks`) |
-| Local, signed in | 6: the same set without `browse_skills`. `browse_skills` and `manage_skills` are listed once the workspace has synced skills, which makes 8 |
-| Local, signed out | the above plus 4 setup tools: `get_auth_status`, `get_setup_status`, `apply_setup`, `complete_setup`. They leave the list at sign-in |
+| Hosted | 7: `start_session`, `recall`, `manage_memory`, `manage_tasks`, `manage_projects`, `browse_skills`, `build_subagent_brief` (the Claude.ai endpoint adds a read-only `read_tasks` and the add-on tools `read_addon` and `use_addon`) |
+| Local, signed in | 8: the same set without `browse_skills`, plus `read_addon` and `use_addon`. `browse_skills` and `manage_skills` are listed once the workspace has synced skills, which makes 10 |
+| Local, signed out | the 6 core tools plus 4 setup tools: `get_auth_status`, `get_setup_status`, `apply_setup`, `complete_setup`. The setup tools leave the list at sign-in and the add-on tools join it |
 
 Older single-purpose names (`update_context`, `get_context`, `import_local_context`, `list_projects`, `record_hot_paths` and the rest) still dispatch, so instruction files already on disk keep working. They are not listed, and a model will usually report an unlisted tool as missing rather than guess at it. Write new instructions against the grouped names below.
+
+### `read_addon` and `use_addon`
+Add-ons are extra kinds of memory, such as a wardrobe or a reading list, switched on per workspace at `/addons` in the dashboard. Every add-on is reached through these two tools, so the list stays the same size however many there are. `read_addon` runs read actions only; `use_addon` runs any action. Start with `help`:
+
+```json
+{ "addon": "notes-example", "action": "help" }
+```
 
 ### `start_session`
 **Call this at the start of every session.** Returns the active project context for the current directory plus a compact map of all other projects: one API call, ~100–180 tokens total.

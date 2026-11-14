@@ -103,9 +103,18 @@ test('FILE-01: the API performs no filesystem writes (so no vault path can escap
         return e.isFile() && e.name.endsWith('.js') ? [full] : [];
     });
 
+    // The one sanctioned writer: add-on file storage on local disk (self-hosted).
+    // Its keys are built by the platform from its own ids, never from a request,
+    // and fileFor() refuses any key that is malformed or resolves outside the
+    // configured root (tests/unit/addons-platform-unit.test.js pins that).
+    const CONFINED_WRITERS = new Set([path.join('addons', 'storage', 'localDisk.js')]);
+    const confined = fs.readFileSync(path.join(srcDir, 'addons', 'storage', 'localDisk.js'), 'utf8');
+    assert.match(confined, /startsWith\(base \+ path\.sep\)/, 'localDisk confines every key to its root');
+
     const offenders = walk(srcDir)
         .filter((f) => WRITE_CALL.test(fs.readFileSync(f, 'utf8')))
-        .map((f) => path.relative(srcDir, f));
+        .map((f) => path.relative(srcDir, f))
+        .filter((rel) => !CONFINED_WRITERS.has(rel));
 
     assert.deepStrictEqual(
         offenders, [],
