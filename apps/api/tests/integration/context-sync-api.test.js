@@ -307,6 +307,16 @@ test('Context sync API', async (t) => {
       })
     );
     assert.strictEqual(codeRes.status, 204, JSON.stringify(codeRes.body));
+
+    // Un-pause before leaving. Preferences belong to the shared system key's
+    // owner, so a pause left behind suppresses every later file's inject in the
+    // same database: layer3-context-sync got 204 when CI sharding put it after
+    // this file.
+    const resetRes = await auth(request(httpServer).patch('/api/v1/context/preferences')).send({
+      paused: false,
+      tools: { chatgpt_web: { enabled: true, verbosity: 'standard' } },
+    });
+    assert.strictEqual(resetRes.status, 200, JSON.stringify(resetRes.body));
   });
 
   await t.test('stores global context updates', async () => {
